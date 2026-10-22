@@ -7,43 +7,49 @@
 /* ============ Scoring engine ============ */
 
 const RECOMMENDATION_THRESHOLD = 60;
+const NDC_PATTERN = /^\d{10,11}$/;
 
-/* Illustrative quality-signal index. Weights and caps are teaching
-   choices modeled on real FDA frameworks — NOT an FDA or WHO rating. */
+/* Illustrative quality-signal index. Weights and caps are teaching choices
+   modeled on real FDA frameworks — NOT an FDA or WHO rating. Therapeutic
+   equivalence (Orange Book code) is a categorical badge, deliberately not
+   scored: an AB rating is a yes/no determination, not a graduated ranking. */
 const CRITERIA = [
-  { key: 'inspectionRecord', label: 'FDA inspection record', weight: 0.25,
+  { key: 'inspectionRecord', label: 'FDA inspection record', weight: 0.30,
     hint: 'Recent inspection outcomes: NAI (clean), VAI (voluntary fixes), OAI (regulatory action)' },
-  { key: 'recallHistory', label: 'Recall history', weight: 0.20,
+  { key: 'recallHistory', label: 'Recall history', weight: 0.25,
     hint: 'No recalls = 100; Class III/II/I recalls reduce the signal' },
   { key: 'batchConsistency', label: 'Batch consistency', weight: 0.20,
-    hint: 'Potency and dissolution variability across manufacturing batches' },
+    hint: 'Simulated teaching value: potency and dissolution variability across batches' },
   { key: 'supplyReliability', label: 'Supply reliability', weight: 0.15,
-    hint: 'History of shortages of this product' },
+    hint: 'Shortage history — relevant because switches between makers are common' },
   { key: 'qualityTransparency', label: 'Quality transparency', weight: 0.10,
     hint: 'Publicly shared quality metrics and site registrations' },
-  { key: 'bioequivalenceRecord', label: 'Bioequivalence record', weight: 0.10,
-    hint: 'Therapeutic-equivalence evidence (Orange Book AB rating, NTI handling)' },
 ];
 
-/* Hard barriers cap the index, Yuka hazard-cap style. Modeled on real
-   FDA enforcement records — applied here to fictional scenarios only. */
+/* Hard barriers derive from structured events — only events that are both
+   product-level and unresolved cap the index. Resolved events inform the
+   historical criteria but never cap. */
 const BARRIERS = [
-  { key: 'classIRecall', cap: 24, severity: 'severe',
-    title: 'Class I recall',
+  { match: (e) => e.kind === 'recall' && e.class === 'I' && e.level === 'product' && isActive(e),
+    cap: 24, severity: 'severe', title: 'Class I recall (active)',
     note: 'A Class I recall means there is a reasonable probability that using the product causes serious harm. Caps the index at 24.' },
-  { key: 'oaiInspection', cap: 24, severity: 'severe',
-    title: 'OAI inspection outcome',
+  { match: (e) => e.kind === 'inspection' && e.outcome === 'OAI' && isActive(e),
+    cap: 24, severity: 'severe', title: 'OAI inspection outcome',
     note: 'FDA classified the facility as Official Action Indicated — an unacceptable state of compliance. Caps the index at 24.' },
-  { key: 'importAlert', cap: 24, severity: 'severe',
-    title: 'Active import alert',
+  { match: (e) => e.kind === 'import-alert' && isActive(e),
+    cap: 24, severity: 'severe', title: 'Active import alert',
     note: 'The manufacturing site is on an FDA import alert, keeping its drugs from legally entering the US. Caps the index at 24.' },
-  { key: 'classIIRecall', cap: 49, severity: 'moderate',
-    title: 'Class II recall',
+  { match: (e) => e.kind === 'recall' && e.class === 'II' && e.level === 'product' && isActive(e),
+    cap: 49, severity: 'moderate', title: 'Class II recall (active)',
     note: 'A Class II recall involves temporary or reversible harm. Caps the index at 49.' },
-  { key: 'ntiConcern', cap: 49, severity: 'moderate',
-    title: 'NTI bioequivalence concern',
-    note: 'Open questions about bioequivalence on a narrow-therapeutic-index drug. Caps the index at 49.' },
+  { match: (e) => e.kind === 'bioequiv-inquiry' && isActive(e),
+    cap: 49, severity: 'moderate', title: 'Open NTI bioequivalence inquiry',
+    note: 'Open FDA questions about bioequivalence on a narrow-therapeutic-index drug. Caps the index at 49.' },
 ];
+
+function isActive(event) {
+  return !/^resolved/i.test(event.status);
+}
 
 /* Risk signals shown as amber cards without capping. */
 const RISKS = [
@@ -58,10 +64,7 @@ const RISKS = [
     note: 'Little public quality data — not proof of a problem, just less visibility.' },
   { test: (a) => a.batchConsistency < 65,
     title: 'Batch variability noted', severity: 'moderate',
-    note: 'Potency or dissolution varies more across batches than peers — a signal to watch, not a safety verdict.' },
-  { test: (a) => a.bioequivalenceRecord < 65,
-    title: 'Thinner bioequivalence evidence', severity: 'moderate',
-    note: 'Less public evidence supporting therapeutic equivalence than peers in this category.' },
+    note: 'Simulated teaching value: potency or dissolution varies more across batches than peers — a signal to watch, not a safety verdict.' },
 ];
 
 /* Positive signals. */
@@ -74,16 +77,13 @@ const POSITIVES = [
     note: 'No FDA recalls for this labeler\'s product line in the mock record.' },
   { test: (a) => a.batchConsistency >= 75,
     title: 'Tight batch consistency',
-    note: 'Batches stay close to target potency and dissolution specs.' },
+    note: 'Simulated teaching value: batches stay close to target potency and dissolution specs.' },
   { test: (a) => a.supplyReliability >= 75,
     title: 'Reliable supply',
     note: 'No shortage history — you are less likely to be switched between manufacturers.' },
   { test: (a) => a.qualityTransparency >= 70,
     title: 'Publishes quality metrics',
     note: 'Voluntarily shares quality data beyond regulatory minimums.' },
-  { test: (a) => a.bioequivalenceRecord >= 85,
-    title: 'Strong bioequivalence record',
-    note: 'Solid therapeutic-equivalence evidence (Orange Book AB-rated).' },
 ];
 
 function tierFor(score) {
@@ -108,13 +108,14 @@ function gradeItem(item) {
     assessed.reduce((s, c) => s + c.points, 0) / assessedWeight
   );
 
-  const barriers = BARRIERS.filter((b) => item.attrs[b.key]);
+  const barriers = BARRIERS.filter((b) => (item.events || []).some(b.match));
   const cap = barriers.length ? Math.min(...barriers.map((b) => b.cap)) : null;
   const score = cap !== null ? Math.min(rawScore, cap) : rawScore;
 
   return {
     item, rawScore, cap, score, contributions, barriers,
     unassessed: contributions.filter((c) => c.value === null).map((c) => c.label),
+    coverage: { assessed: assessed.length, total: CRITERIA.length, weight: Math.round(assessedWeight * 100) },
     tier: tierFor(score),
     capped: cap !== null && rawScore > cap,
   };
@@ -133,6 +134,15 @@ function findAlternatives(item) {
 
 function ndcDigits(ndc) {
   return String(ndc || '').replace(/\D/g, '');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&' + 'amp;')
+    .replace(/</g, '&' + 'lt;')
+    .replace(/>/g, '&' + 'gt;')
+    .replace(/"/g, '&' + 'quot;')
+    .replace(/'/g, '&' + '#39;');
 }
 
 function tierClassFor(value) {
@@ -170,33 +180,48 @@ function flagCard(flag, kind) {
     </div>`;
 }
 
+function teCard(item) {
+  if (item.teStatus === 'inquiry') {
+    return flagCard({ severity: 'moderate', title: 'Open bioequivalence inquiry',
+      note: 'Therapeutic-equivalence status is under FDA review for this product (mock scenario). Not a safety verdict.' }, 'risk');
+  }
+  return flagCard({ title: 'Orange Book AB rating (mock)',
+    note: 'FDA-rated therapeutically equivalent to the reference product. Shown as a categorical badge — deliberately not part of the numeric index, since an AB rating is not a graduated ranking.' }, 'positive');
+}
+
 function renderResult(item) {
   const g = gradeItem(item);
   const edu = DRUG_EDUCATION[item.ingredientKey];
   const risks = RISKS.filter((r) => r.test(item.attrs));
   const positives = POSITIVES.filter((p) => p.test(item.attrs));
   const candidates = g.score < RECOMMENDATION_THRESHOLD ? findAlternatives(item) : null;
+  const labelerEvents = (item.events || []).filter((e) => e.level === 'labeler');
 
   const capNotice = g.capped ? `
     <div class="cap-notice ${g.barriers.some((b) => b.severity === 'severe') ? 'is-severe' : 'is-moderate'}">
       <strong>Index capped at ${g.cap}</strong>
-      ${g.barriers.map((b) => b.title).join(' · ')} — raw weighted index of ${g.rawScore} is limited by this barrier.
+      ${g.barriers.map((b) => b.title).join(' · ')} — raw weighted index of ${g.rawScore} is limited by this active barrier.
     </div>` : '';
 
-  const unassessedNotice = g.unassessed.length ? `
-    <p class="recs-note">Not assessed (excluded, weights re-normalized): ${g.unassessed.join(', ')}. Missing evidence is neither rewarded nor penalized.</p>` : '';
+  const coverageChip = `
+    <p class="coverage-chip">
+      ${g.coverage.assessed} of ${g.coverage.total} signals assessed · ${g.coverage.weight}% of weight covered
+    </p>`;
 
-  const eventsSection = item.events.length ? `
+  const unassessedNotice = g.unassessed.length ? `
+    <p class="recs-note">Not assessed (excluded, weights re-normalized): ${g.unassessed.join(', ')}. Re-normalizing is not neutral — excluding a low signal can raise the index — so treat partial coverage with caution.</p>` : '';
+
+  const eventsSection = (item.events || []).length ? `
     <section class="flags" aria-labelledby="eventsHeading">
       <h3 id="eventsHeading">Documented events (mock)</h3>
       <ul class="event-list">
-        ${item.events.map((e) => `
+        ${(item.events || []).map((e) => `
           <li class="event-item">
-            <span class="event-kind">${e.kind}</span>
-            <span class="event-meta">${e.when} · ${e.scope} · ${e.status}</span>
+            <span class="event-kind">${escapeHtml(e.kind === 'recall' ? `Class ${e.class} recall` : e.kind === 'inspection' ? `${e.outcome} inspection` : e.kind)}${e.level === 'labeler' ? ' · labeler-wide (other product)' : ''}</span>
+            <span class="event-meta">${escapeHtml(e.when)} · ${escapeHtml(e.scope)} · ${escapeHtml(e.status)}</span>
           </li>`).join('')}
       </ul>
-      <p class="recs-note">Historical events are scoped to specific sites, lots, and dates — an old recall does not mean every product is currently affected.</p>
+      <p class="recs-note">Only active, product-level events cap the index. Resolved events and labeler-wide context are track-record signals — an old or unrelated recall does not mean this product is currently affected.</p>
     </section>` : '';
 
   const ntiCallout = edu.nti ? `
@@ -253,9 +278,10 @@ function renderResult(item) {
         ${dialSvg(g.score, g.tier)}
         <div class="score-meta">
           <span class="badge badge-${g.tier.id}"><span class="dot dot-${g.tier.id}" aria-hidden="true"></span>${g.tier.label}</span>
+          ${coverageChip}
           <p class="score-caption">
             <strong>Illustrative quality-signal index.</strong> A teaching score about the
-            <strong>manufacturer's regulatory track record</strong> — not a measure of whether this
+            <strong>labeler's regulatory track record</strong> — not a measure of whether this
             medicine is right for you, or of its clinical safety or effectiveness.
           </p>
         </div>
@@ -278,7 +304,7 @@ function renderResult(item) {
               : `<div class="bar-track"><div class="bar-fill ${tierClassFor(c.value)}" style="width:${c.value}%"></div></div>`}
           </div>`).join('')}
         ${unassessedNotice}
-        <p class="recs-note">Index = Σ (criterion 0–100 × weight)${g.cap !== null ? `, capped at ${g.cap} by barriers` : ''}. Raw index before caps: ${g.rawScore}. Weights and caps are teaching choices modeled on FDA frameworks — not an FDA rating.</p>
+        <p class="recs-note">Index = Σ (criterion 0–100 × weight)${g.cap !== null ? `, capped at ${g.cap} by active barriers` : ''}. Raw index before caps: ${g.rawScore}. Criterion values are simulated teaching values, not researched product data. Weights and caps are teaching choices modeled on FDA frameworks — not an FDA rating.</p>
       </section>
 
       <section class="flags" aria-labelledby="flagHeading">
@@ -286,6 +312,7 @@ function renderResult(item) {
         <div class="flag-grid">
           ${g.barriers.map((b) => flagCard(b, 'risk')).join('')}
           ${risks.map((r) => flagCard(r, 'risk')).join('')}
+          ${teCard(item)}
           ${positives.map((p) => flagCard(p, 'positive')).join('')}
         </div>
       </section>
@@ -294,14 +321,14 @@ function renderResult(item) {
 
       <section class="edu" aria-labelledby="eduHeading">
         <h3 id="eduHeading">About the medicine itself</h3>
-        <p class="edu-sub">${edu.ingredient} · ${edu.drugClass} — independent of the manufacturer score above.</p>
+        <p class="edu-sub">${edu.ingredient} · ${edu.drugClass} — independent of the manufacturer score above. Full patient information: <a href="${edu.source.url}" target="_blank" rel="noopener">${edu.source.name}</a>.</p>
         <div class="edu-grid">
           <div class="edu-card"><h4>What it treats</h4><p>${edu.uses}</p></div>
           <div class="edu-card"><h4>Key cautions</h4><p>${edu.cautions}</p></div>
           <div class="edu-card"><h4>Monitoring</h4><p>${edu.monitoring}</p></div>
         </div>
         ${ntiCallout}
-        <p class="recs-note">Full patient information: <a href="${edu.source.url}" target="_blank" rel="noopener">${edu.source.name}</a>. This is general education, not personal medical advice.</p>
+        <p class="recs-note">General education from ${edu.source.name}, not personal medical advice.</p>
       </section>
 
       ${candidatesSection}
@@ -312,12 +339,30 @@ function renderResult(item) {
 }
 
 function renderNotFound(code) {
+  const safe = escapeHtml(code);
   resultEl.innerHTML = `
     <section class="not-found">
       <h3>NDC not in the mock database</h3>
-      <p><span class="code">${code}</span> isn't one of the ${PRODUCTS.length} fictional products in this
+      <p><span class="code">${safe}</span> isn't one of the ${PRODUCTS.length} fictional products in this
       prototype. A production version would look the NDC up in the FDA's public
       <a href="https://www.fda.gov/drugs/drug-approvals-and-databases/national-drug-code-directory" target="_blank" rel="noopener">NDC Directory</a>.</p>
+      <button class="btn btn-ghost" id="browseCatalogBtn" type="button">Browse the mock catalog</button>
+    </section>`;
+  resultEl.hidden = false;
+  document.getElementById('browseCatalogBtn').addEventListener('click', () => {
+    document.querySelector('.catalog').scrollIntoView({ behavior: 'smooth' });
+  });
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderUnsupportedPayload(payload) {
+  const safe = escapeHtml(payload);
+  resultEl.innerHTML = `
+    <section class="not-found">
+      <h3>That barcode doesn't look like an NDC</h3>
+      <p>Drug packages also carry lot numbers and expiry codes. The NDC is the 10–11 digit code,
+      usually printed in a 5-4-2 pattern like 90909-0011-10. You read: <span class="code">${safe}</span>.
+      Type the NDC instead — or pick a sample below.</p>
       <button class="btn btn-ghost" id="browseCatalogBtn" type="button">Browse the mock catalog</button>
     </section>`;
   resultEl.hidden = false;
@@ -330,10 +375,15 @@ function renderNotFound(code) {
 /* ============ Lookup ============ */
 
 function lookup(code) {
-  const digits = ndcDigits(code);
+  const raw = String(code || '').trim();
+  const digits = ndcDigits(raw);
+  if (!NDC_PATTERN.test(digits)) {
+    renderUnsupportedPayload(raw || '(empty)');
+    return;
+  }
   const item = PRODUCTS.find((i) => ndcDigits(i.ndc) === digits);
   if (item) renderResult(item);
-  else renderNotFound(digits || code);
+  else renderNotFound(digits);
 }
 
 /* ============ Camera scanning ============ */
@@ -379,11 +429,19 @@ async function startCamera() {
     const formats = await window.BarcodeDetector.getSupportedFormats();
     detector = new window.BarcodeDetector({ formats });
   } catch (err) {
-    detector = new window.BarcodeDetector();
+    stopCamera();
+    setScanError('Barcode detection could not start in this browser. Type the NDC instead.');
+    return;
   }
 
   video.srcObject = stream;
-  await video.play();
+  try {
+    await video.play();
+  } catch (err) {
+    stopCamera();
+    setScanError('Camera stream could not be displayed. Type the NDC instead.');
+    return;
+  }
   videoWrap.classList.add('is-live');
   videoIdle.setAttribute('hidden', '');
   startCameraBtn.hidden = true;
