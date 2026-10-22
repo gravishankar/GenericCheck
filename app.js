@@ -621,6 +621,77 @@ function esc(v) {
   return escapeHtml(Array.isArray(v) ? v.join(', ') : (v ?? '—'));
 }
 
+/* ProPublica Rx Inspector public data release (CC BY-NC 4.0):
+   NDC -> registered manufacturing facility records. Records only — never
+   scored, badged, or judged. Data release vintage: November 2025. */
+const RX_CSV_URL = 'https://raw.githubusercontent.com/propublica/rx-inspector-data/main/ndc_fei.csv';
+const RX_RELEASE_VINTAGE = 'November 2025';
+let rxDataCache = null;
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQ = false;
+      } else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (c === '\r') { /* skip */ }
+    else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  const header = rows.shift() || [];
+  return rows.map((r) => {
+    const o = {};
+    header.forEach((h, i) => { o[h] = (r[i] || '').trim(); });
+    return o;
+  });
+}
+
+async function loadRxData() {
+  if (rxDataCache) return rxDataCache;
+  const res = await fetch(RX_CSV_URL);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  const byNdc = new Map();
+  for (const row of parseCsv(text)) {
+    if (!row.ndc) continue;
+    if (!byNdc.has(row.ndc)) byNdc.set(row.ndc, []);
+    byNdc.get(row.ndc).push(row);
+  }
+  rxDataCache = byNdc;
+  return byNdc;
+}
+
+/* The release indexes dashed 2-segment product NDCs; derive candidates from
+   whatever the user typed (dashed or bare digits, 10/11/8 length). */
+function rxProductCandidates(raw, digits) {
+  const out = new Set();
+  if (raw.includes('-')) out.add(raw.split('-').slice(0, 2).join('-'));
+  if (/^\d{8}$/.test(digits)) {
+    out.add(digits.slice(0, 4) + '-' + digits.slice(4));
+    out.add(digits.slice(0, 5) + '-' + digits.slice(5));
+  } else if (/^\d{10}$/.test(digits)) {
+    out.add(digits.slice(0, 4) + '-' + digits.slice(4, 8));
+    out.add(digits.slice(0, 5) + '-' + digits.slice(5, 8));
+  } else if (/^\d{11}$/.test(digits)) {
+    out.add(digits.slice(0, 5) + '-' + digits.slice(5, 9));
+    out.add(digits.slice(0, 4) + '-' + digits.slice(4, 9));
+  }
+  return out;
+}
+
+function rxLinkageGloss(m) {
+  if (m === 'SPL_DUNS_FEI') return 'link from the drug label\u2019s own facility identifier';
+  if (m === 'ADDRESS_MATCH') return 'matched by facility address';
+  return m || 'not stated';
+}
+
 async function runLiveCheck(rawQuery) {
   const digits = ndcDigits(rawQuery);
   const isNdc = /^\d{10,11}$/.test(digits);
@@ -663,6 +734,44 @@ async function runLiveCheck(rawQuery) {
       }
     }
 
+    // Registered facilities: ProPublica Rx Inspector data release (records only)
+    let facilitiesHtml = '';
+    if (isNdc) {
+      liveResults.innerHTML = identityHtml + '<p class="live-status">Loading registered-facility records from ProPublica\u2019s Rx Inspector data release (a ~3 MB download, once per visit)\u2026</p>';
+      let rxRows = null;
+      let rxFailure = null;
+      try {
+        const byNdc = await loadRxData();
+        const candidates = rxProductCandidates(rawQuery.trim(), digits);
+        rxRows = [];
+        for (const c of candidates) {
+          if (byNdc.has(c)) rxRows.push(...byNdc.get(c));
+        }
+      } catch (err) {
+        rxFailure = String(err.message || err);
+      }
+      if (rxFailure) {
+        facilitiesHtml = '<div class="live-card"><h4>Registered manufacturing facilities</h4><p class="live-status is-error">Rx Inspector data unreachable (' + escapeHtml(rxFailure) + ') \u2014 a source failure, not "no facilities". Search the NDC directly at <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">Rx Inspector</a>.</p></div>';
+      } else if (!rxRows.length) {
+        facilitiesHtml = `
+          <div class="live-card">
+            <h4>Registered manufacturing facilities</h4>
+            <p class="live-row">No facilities listed for this product NDC in the Rx Inspector release \u2014 which is <strong>not</strong> evidence that none exist. The release links roughly 80% of generics; search the NDC at <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">Rx Inspector</a> before concluding anything.</p>
+          </div>`;
+      } else {
+        facilitiesHtml = `
+          <div class="live-card">
+            <h4>Registered manufacturing facilities (records \u2014 not a judgment)</h4>
+            ${rxRows.map((f) => `
+              <div class="live-recall">
+                <p class="live-row"><strong>${escapeHtml(f.registrant)}</strong> \u00b7 country: ${escapeHtml(f.country)} \u00b7 FDA establishment ID: ${escapeHtml(f.fei)}${f.api_mfr === 'TRUE' ? ' \u00b7 API (raw ingredient) facility only' : ''}</p>
+                <p class="live-row">Linkage: ${escapeHtml(rxLinkageGloss(f.linkage_method))}${f.anda ? ' \u00b7 ' + escapeHtml(f.anda) : ''}${f.nda ? ' \u00b7 ' + escapeHtml(f.nda) + ' (authorized generic)' : ''}${f.bla ? ' \u00b7 ' + escapeHtml(f.bla) : ''}</p>
+              </div>`).join('')}
+            <p class="recs-note">The registrant is the company that registered the facility \u2014 sometimes, not always, the labeler on your bottle. A facility list does not prove which site made your lot: check the lot number with your pharmacist. For each facility\u2019s FDA inspection track record, search it at <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">ProPublica\u2019s Rx Inspector</a>.</p>
+          </div>`;
+      }
+    }
+
     // Recalls: query by generic name via harmonized annotation, fall back to product description
     let rec = await fdaFetch(`drug/enforcement.json?search=openfda.generic_name:"${encodeURIComponent(genericName)}"&sort=report_date:desc&limit=5`);
     if (rec.error) {
@@ -692,8 +801,9 @@ async function runLiveCheck(rawQuery) {
 
     liveResults.innerHTML = `
       ${identityHtml}
+      ${facilitiesHtml}
       ${recallsHtml}
-      <p class="recs-note">Source: FDA openFDA API (api.fda.gov), queried ${new Date().toLocaleString()}. Real regulatory records — never scored, ranked, or mixed into the mock index. openFDA's own disclaimer: results are unvalidated; do not rely on them alone for medical decisions.</p>`;
+      <p class="recs-note">Provenance: FDA <a href="https://open.fda.gov" target="_blank" rel="noopener">openFDA</a> API (NDC Directory, recall enforcement), queried ${new Date().toLocaleString()} \u00b7 Rx Inspector data \u00a9 <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">ProPublica</a>, used under <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a> (release: ${RX_RELEASE_VINTAGE}). All records may be outdated or incomplete \u2014 absence of records is not evidence of absence. Real regulatory records are never scored, badged, ranked, or mixed into the mock index, and no assessment of any real company is made. openFDA's own disclaimer: results are unvalidated; do not rely on them alone for medical decisions.</p>`;
   } catch (err) {
     liveResults.innerHTML = '<p class="live-status is-error">Could not reach the FDA API (network or CORS failure). This is a source failure — not "no findings". You can search the same records at open.fda.gov.</p>';
   }

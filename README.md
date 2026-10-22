@@ -129,6 +129,18 @@ GeneriCheck keeps its legal notices visible at all times, in three layers:
 
 GeneriCheck is an educational prototype and is not a substitute for professional judgment. If any information here conflicts with your prescriber's guidance, follow your prescriber.
 
+## Data sources & licensing
+
+The live check and monthly reports use real, openly licensed data — displayed as records only, never scored or judged:
+
+| Source | What it provides | License |
+|---|---|---|
+| [FDA openFDA API](https://open.fda.gov/apis/) | Product identity (NDC Directory) and recall enforcement records | Public domain ([CC0](https://open.fda.gov/license/)) |
+| [ProPublica Rx Inspector data release](https://github.com/propublica/rx-inspector-data) | Registered manufacturing facilities linked to product NDCs (release: November 2025) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — noncommercial, attribution required |
+| [MedlinePlus](https://medlineplus.gov/druginfo/meds/a682461.html) | Medicine education | Public domain |
+
+Attribution is shown on every result and in the footer. Because the Rx Inspector data is licensed for noncommercial use only, this app must stay free and noncommercial. The app is not affiliated with or endorsed by the FDA or ProPublica.
+
 ## Honest limitations
 
 - The **mock scoring is fictional** (fictional manufacturers, clearly badged). It teaches signal-reading; it does not rate real companies.

@@ -95,9 +95,12 @@
     <section class="live-check" aria-labelledby="liveHeading">
       <h2 id="liveHeading">Live regulatory check — real FDA data</h2>
       <p class="catalog-note">
-        Queries the FDA's <a href="https://open.fda.gov/apis/drug/enforcement/" target="_blank" rel="noopener">openFDA API</a> directly from your browser.
-        Real records — completely separate from the mock scoring above and never scored. Enter a drug
-        name (e.g. <em>metformin</em>) or an NDC.
+        Queries real regulatory records directly from your browser — three sources, records only:
+        the FDA's <a href="https://open.fda.gov/apis/drug/ndc/" target="_blank" rel="noopener">NDC Directory</a> (product identity),
+        FDA <a href="https://open.fda.gov/apis/drug/enforcement/" target="_blank" rel="noopener">recall enforcement reports</a>, and
+        registered manufacturing facilities from <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">ProPublica's Rx Inspector</a> data release.
+        No scores, badges, or judgments are made about real companies — ever. Enter a drug name (e.g. <em>metformin</em>) or an NDC;
+        NDCs also look up registered facilities.
       </p>
       <form class="manual-form" id="liveForm">
         <label class="field-label" for="liveInput">Drug name or NDC</label>
@@ -187,6 +190,9 @@
       <a href="https://www.fda.gov/safety/industry-guidance-recalls/recalls-background-and-definitions" target="_blank" rel="noopener">FDA recall classes</a>, and the
       <a href="https://www.fda.gov/drugs/development-approval-process-drugs/orange-book-preface" target="_blank" rel="noopener">Orange Book preface</a>;
       medication education from <a href="https://medlineplus.gov/druginfo/meds/a600045.html" target="_blank" rel="noopener">MedlinePlus</a>.
+      Live records: data provided by the U.S. Food and Drug Administration (<a href="https://open.fda.gov" target="_blank" rel="noopener">open.fda.gov</a>, public domain) and Rx Inspector data ©
+      <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">ProPublica</a>, used under
+      <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a> (release: November 2025).
     </p>
     <p>
       GeneriCheck is provided for education only, "as is," without warranty of any kind, and without
@@ -278,7 +284,7 @@
       <h3>3. Fictional data</h3>
       <p>Every manufacturer, NDC, event, and score in the mock catalog is fictional, clearly badged, and included for teaching only. The illustrative quality-signal index does not rate, rank, or evaluate any real company, product, or facility.</p>
       <h3>4. Third-party data</h3>
-      <p>Live regulatory records come from the U.S. Food and Drug Administration's openFDA API and other public sources (including ProPublica's Rx Inspector and MedlinePlus). This app is not affiliated with, endorsed by, or supported by any of them. Third-party data is provided "as is" and may be incomplete, delayed, or inaccurate.</p>
+      <p>Live regulatory records come from the U.S. Food and Drug Administration's <a href="https://open.fda.gov" target="_blank" rel="noopener">openFDA</a> API (NDC Directory and recall enforcement reports, public domain / CC0) and from ProPublica's <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">Rx Inspector</a> data release (© ProPublica, used under <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">Creative Commons BY-NC 4.0</a>). This app is not affiliated with, endorsed by, or supported by the FDA or ProPublica, and does not represent either. Third-party data is provided "as is" and may be incomplete, outdated, or inaccurate — absence of records is not evidence of absence. The app displays these records verbatim as evidence and makes no assessment, judgment, rating, or recommendation about any real company, product, or facility.</p>
       <h3>5. No reliance and no warranty</h3>
       <p>The app and all of its content are provided "as is" and "as available," without warranty of any kind, express or implied — including warranties of merchantability, fitness for a particular purpose, accuracy, and non-infringement. Do not rely on this app alone for any decision.</p>
       <h3>6. Limitation of liability</h3>
