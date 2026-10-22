@@ -90,6 +90,40 @@
       <p class="catalog-note">All 15 fictional products in the prototype database. Tap any card to grade it.</p>
       <div class="catalog-grid" id="catalogGrid"></div>
     </section>
+
+    <section class="live-check" aria-labelledby="liveHeading">
+      <h2 id="liveHeading">Live regulatory check — real FDA data</h2>
+      <p class="catalog-note">
+        Queries the FDA's <a href="https://open.fda.gov/apis/drug/enforcement/" target="_blank" rel="noopener">openFDA API</a> directly from your browser.
+        Real records — completely separate from the mock scoring above and never scored. Enter a drug
+        name (e.g. <em>metformin</em>) or an NDC.
+      </p>
+      <form class="manual-form" id="liveForm">
+        <label class="field-label" for="liveInput">Drug name or NDC</label>
+        <div class="manual-row">
+          <input id="liveInput" class="code-input" name="liveQuery" autocomplete="off" placeholder="e.g. metformin or 0069-2110" spellcheck="false">
+          <button class="btn btn-primary" type="submit">Check FDA records</button>
+        </div>
+      </form>
+      <div id="liveResults"></div>
+    </section>
+
+    <section class="monitor" aria-labelledby="monitorHeading">
+      <h2 id="monitorHeading">Monthly monitoring checklist</h2>
+      <p class="catalog-note">This page doesn't monitor on its own — run these steps monthly for each medicine. A scheduled assistant task can do this for you if you share your med list.</p>
+      <ol class="checklist">
+        <li><strong>Confirm identity.</strong> Read the NDC and labeler from your label; look the product up in the <a href="https://www.fda.gov/drugs/drug-approvals-and-databases/national-drug-code-directory" target="_blank" rel="noopener">FDA NDC Directory</a> (or the live check above).</li>
+        <li><strong>Find the factory.</strong> Enter your drug + labeler (or NDC) in <a href="https://projects.propublica.org/rx-inspector/" target="_blank" rel="noopener">ProPublica's Rx Inspector</a> — it links NDCs to registered manufacturing facilities.</li>
+        <li><strong>Check inspection history.</strong> Rx Inspector shows the facility's FDA inspection timeline; <a href="https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/inspection-basics/inspection-classifications" target="_blank" rel="noopener">FDA inspection classifications</a> explain what NAI/VAI/OAI mean. A gap in public records is an information flag, not proof a site is uninspected or unsafe.</li>
+        <li><strong>Check for new recalls.</strong> Use the live check above or the <a href="https://open.fda.gov/apis/drug/enforcement/" target="_blank" rel="noopener">openFDA enforcement API</a>. Confirm scope: an old or unrelated-lot recall doesn't affect your bottle. <a href="https://www.fda.gov/safety/industry-guidance-recalls/recalls-background-and-definitions" target="_blank" rel="noopener">Recall class definitions</a>.</li>
+        <li><strong>Check therapeutic equivalence.</strong> Look up the TE code in the <a href="https://www.fda.gov/drugs/drug-approvals-and-databases/approved-drug-products-therapeutic-equivalence-evaluations-orange-book" target="_blank" rel="noopener">Orange Book</a>.</li>
+        <li><strong>Update your med list whenever a label shows a new maker</strong> — and note the lot number so recalls can be checked against it.</li>
+      </ol>
+      <p class="recs-note">
+        For researchers: ProPublica publishes the underlying NDC-to-factory data on
+        <a href="https://github.com/propublica/rx-inspector-data" target="_blank" rel="noopener">GitHub</a> (Creative Commons, noncommercial with attribution).
+      </p>
+    </section>
   </main>
 
   <footer class="site-footer">
@@ -149,6 +183,20 @@
         <li><span class="dot dot-yellow" aria-hidden="true"></span>40–69 — Mixed quality signals</li>
         <li><span class="dot dot-red" aria-hidden="true"></span>0–39 — Serious quality concerns</li>
       </ul>
+      <h3>Identity and evidence</h3>
+      <p>
+        The NDC confirms the product and labeler — not the factory. Maker identity needs facility-level
+        records (Rx Inspector links NDCs to registered factories); when records can't establish it,
+        the answer is "unconfirmed", never a guess. A list of a company's plants doesn't prove which
+        made your lot, and single-plant production is a supply-chain fact, not a quality verdict.
+      </p>
+      <h3>Live vs. mock boundary</h3>
+      <p>
+        The live check fetches real records from the FDA's openFDA API and never scores or ranks
+        them. "No matching records" means none found in that query — not "no recalls exist".
+        Findings are scoped to product, facility, lots, and dates; applicability to your medicine is
+        confirmed, possible, or unconfirmed.
+      </p>
       <h3>Alternatives</h3>
       <p>
         Below <strong>60</strong>, the app lists up to three labelers of the <strong>same active

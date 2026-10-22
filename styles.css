@@ -519,3 +519,61 @@ dialog::backdrop { background: rgba(35, 33, 27, 0.5); }
   .manual-row { flex-direction: column; }
   .manual-row .btn { width: 100%; }
 }
+
+/* Silent-switch callout */
+.switch-callout {
+  margin-top: var(--space-6);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-sm);
+}
+.switch-callout strong { color: inherit; }
+
+/* Supply-chain profile */
+.supply-chain {
+  margin-top: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+.supply-chain h3 { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
+
+/* Live check section */
+.live-check { margin-top: var(--space-16); }
+.live-check h2 { font-size: var(--text-lg); font-weight: 700; }
+.live-card {
+  margin-top: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+.live-card h4 { font-size: var(--text-sm); margin-bottom: var(--space-3); }
+.live-row { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
+.live-row strong { color: var(--ink); }
+.live-recall {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+.live-recall:first-of-type { border-top: none; }
+.live-status { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--muted); }
+.live-status.is-error { color: var(--red); }
+
+/* Monitoring checklist */
+.monitor { margin-top: var(--space-16); }
+.monitor h2 { font-size: var(--text-lg); font-weight: 700; }
+.checklist {
+  margin: var(--space-4) 0 0;
+  padding-left: var(--space-6);
+  display: grid;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  max-width: 72ch;
+}
+.checklist strong { color: var(--ink); }
+.checklist a { color: var(--accent-ink); }
+.monitor .recs-note { margin-top: var(--space-4); }

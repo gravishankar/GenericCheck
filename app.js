@@ -27,29 +27,25 @@ const CRITERIA = [
 ];
 
 /* Hard barriers derive from structured events — only events that are both
-   product-level and unresolved cap the index. Resolved events inform the
+   product-level and explicitly active cap the index. Resolved events inform the
    historical criteria but never cap. */
 const BARRIERS = [
-  { match: (e) => e.kind === 'recall' && e.class === 'I' && e.level === 'product' && isActive(e),
+  { match: (e) => e.kind === 'recall' && e.class === 'I' && e.level === 'product' && e.status === 'active',
     cap: 24, severity: 'severe', title: 'Class I recall (active)',
     note: 'A Class I recall means there is a reasonable probability that using the product causes serious harm. Caps the index at 24.' },
-  { match: (e) => e.kind === 'inspection' && e.outcome === 'OAI' && isActive(e),
+  { match: (e) => e.kind === 'inspection' && e.outcome === 'OAI' && e.level === 'product' && e.status === 'active',
     cap: 24, severity: 'severe', title: 'OAI inspection outcome',
     note: 'FDA classified the facility as Official Action Indicated — an unacceptable state of compliance. Caps the index at 24.' },
-  { match: (e) => e.kind === 'import-alert' && isActive(e),
+  { match: (e) => e.kind === 'import-alert' && e.level === 'product' && e.status === 'active',
     cap: 24, severity: 'severe', title: 'Active import alert',
     note: 'The manufacturing site is on an FDA import alert, keeping its drugs from legally entering the US. Caps the index at 24.' },
-  { match: (e) => e.kind === 'recall' && e.class === 'II' && e.level === 'product' && isActive(e),
+  { match: (e) => e.kind === 'recall' && e.class === 'II' && e.level === 'product' && e.status === 'active',
     cap: 49, severity: 'moderate', title: 'Class II recall (active)',
     note: 'A Class II recall involves temporary or reversible harm. Caps the index at 49.' },
-  { match: (e) => e.kind === 'bioequiv-inquiry' && isActive(e),
+  { match: (e) => e.kind === 'bioequiv-inquiry' && e.level === 'product' && e.status === 'active',
     cap: 49, severity: 'moderate', title: 'Open NTI bioequivalence inquiry',
     note: 'Open FDA questions about bioequivalence on a narrow-therapeutic-index drug. Caps the index at 49.' },
 ];
-
-function isActive(event) {
-  return !/^resolved/i.test(event.status);
-}
 
 /* Risk signals shown as amber cards without capping. */
 const RISKS = [
@@ -218,7 +214,7 @@ function renderResult(item) {
         ${(item.events || []).map((e) => `
           <li class="event-item">
             <span class="event-kind">${escapeHtml(e.kind === 'recall' ? `Class ${e.class} recall` : e.kind === 'inspection' ? `${e.outcome} inspection` : e.kind)}${e.level === 'labeler' ? ' · labeler-wide (other product)' : ''}</span>
-            <span class="event-meta">${escapeHtml(e.when)} · ${escapeHtml(e.scope)} · ${escapeHtml(e.status)}</span>
+            <span class="event-meta">${escapeHtml(e.when)} · ${escapeHtml(e.scope)} · ${escapeHtml(e.statusNote)}</span>
           </li>`).join('')}
       </ul>
       <p class="recs-note">Only active, product-level events cap the index. Resolved events and labeler-wide context are track-record signals — an old or unrelated recall does not mean this product is currently affected.</p>
@@ -262,15 +258,44 @@ function renderResult(item) {
       </div>
 
       <section class="identity" aria-labelledby="identityHeading">
-        <h3 id="identityHeading">What the code identifies</h3>
+        <h3 id="identityHeading">What the code identifies — and what it doesn't</h3>
         <p class="identity-ndc">
           <span class="ndc-seg">${item.ndc.split('-')[0]}</span>–<span class="ndc-seg">${item.ndc.split('-')[1]}</span>–<span class="ndc-seg">${item.ndc.split('-')[2]}</span>
         </p>
         <p class="recs-note">
-          The first segment is the <strong>labeler code</strong> — the company named on the drug label.
-          It may be the maker, or a repackager or distributor. The middle segment is the specific
-          product (ingredient + strength + form); the last is the package size. An NDC identifies a
-          product, not a lot — check the lot and expiry printed near it.
+          The NDC confirms the <strong>product and labeler</strong> (the company named on the label — it may be
+          the maker, or a repackager or distributor). It does <strong>not</strong> identify the factory.
+          Registered maker per the mock record: <strong>${item.manufacturing.maker}</strong>
+          ${item.manufacturing.maker !== item.labeler ? `(the labeler is a repackager) ` : ''}—
+          identity status: <strong>${item.manufacturing.siteStatus === 'one-known-site' ? 'one known site' : item.manufacturing.siteStatus === 'multiple-known-sites' ? 'multiple known sites' : 'site unconfirmed'}</strong>
+          (evidence: ${item.manufacturing.evidence}). In real use, maker identity requires facility-level records —
+          ProPublica's Rx Inspector links NDCs to registered factories — and when records can't establish it,
+          the honest answer is "unconfirmed", never a guess. An NDC identifies a product, not a lot —
+          check the lot and expiry printed near it.
+        </p>
+      </section>
+
+      <div class="switch-callout">
+        <strong>The silent switch.</strong>
+        An NDC locks the labeler, not the maker: the labeler can change manufacturers or shift production
+        between plants without changing a digit on the barcode. To learn who made your bottle, check the
+        lot number with your pharmacist. For medicines you and your prescriber have identified as
+        consistency-sensitive (commonly levothyroxine and warfarin), ask whether a maker change warrants
+        a lab recheck (TSH or INR).
+      </div>
+
+      <section class="supply-chain" aria-labelledby="scHeading">
+        <h3 id="scHeading">Supply-chain profile (information only, not scored)</h3>
+        <p class="recs-note">
+          Known manufacturing sites in the mock record: ${item.manufacturing.sites.join('; ')}.<br>
+          ${item.manufacturing.siteStatus === 'one-known-site'
+            ? 'One known site — fewer moving parts, but that is a supply-chain fact, not a quality verdict.'
+            : item.manufacturing.siteStatus === 'multiple-known-sites'
+            ? 'Multiple known sites — production can shift between plants without any NDC change.'
+            : 'Site unconfirmed — public records did not establish the producing plant, which is common; it is not evidence of a problem.'}
+          Single-plant production is not by itself evidence of higher quality or safety — for
+          consistency-sensitive medicines, discuss supply-chain stability with your pharmacist rather than
+          assuming a simple rule.
         </p>
       </section>
 
@@ -574,4 +599,109 @@ dialog.addEventListener('click', (e) => {
 document.getElementById('wordmarkHome').addEventListener('click', (e) => {
   e.preventDefault();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+/* ============ Live regulatory check (real FDA openFDA API) ============
+   Real records, fetched directly from api.fda.gov in the user's browser.
+   Completely separate from the mock scoring above: live results are never
+   scored, ranked, or mixed into the mock index. */
+
+const liveForm = document.getElementById('liveForm');
+const liveInput = document.getElementById('liveInput');
+const liveResults = document.getElementById('liveResults');
+
+async function fdaFetch(query) {
+  const res = await fetch('https://api.fda.gov/' + query);
+  if (res.status === 404) return { notFound: true };
+  if (!res.ok) return { error: 'HTTP ' + res.status };
+  return res.json();
+}
+
+function esc(v) {
+  return escapeHtml(Array.isArray(v) ? v.join(', ') : (v ?? '—'));
+}
+
+async function runLiveCheck(rawQuery) {
+  const digits = ndcDigits(rawQuery);
+  const isNdc = /^\d{10,11}$/.test(digits);
+  const name = rawQuery.trim().replace(/["]/g, '');
+  liveResults.innerHTML = '<p class="live-status">Querying the FDA openFDA API…</p>';
+
+  try {
+    let identityHtml = '';
+    let genericName = name;
+
+    if (isNdc) {
+      // openFDA indexes NDCs in dashed format; try raw-as-typed, digits, and
+      // both package/product segments before concluding "no match".
+      const raw = rawQuery.trim();
+      const productSegment = raw.includes('-') ? raw.split('-').slice(0, 2).join('-') : '';
+      const attempts = [];
+      if (raw.includes('-')) {
+        attempts.push(`drug/ndc.json?search=package_ndc:"${raw}"&limit=5`);
+        if (productSegment) attempts.push(`drug/ndc.json?search=product_ndc:"${productSegment}"&limit=5`);
+      }
+      if (digits.length === 11) attempts.push(`drug/ndc.json?search=package_ndc:"${digits.slice(0,5)}-${digits.slice(5,9)}-${digits.slice(9)}"&limit=5`);
+      attempts.push(`drug/ndc.json?search=product_ndc:"${digits}"&limit=5`);
+      let ndcData = null;
+      for (const q of attempts) {
+        const r = await fdaFetch(q);
+        if (r.results) { ndcData = r; break; }
+        if (r.error) { liveResults.innerHTML = '<p class="live-status is-error">FDA API error (' + r.error + ') — this is a source failure, not "no findings". Try again shortly.</p>'; return; }
+      }
+      if (ndcData) {
+        genericName = ndcData.results[0].generic_name || name;
+        identityHtml = `
+          <div class="live-card">
+            <h4>NDC Directory — product identity (real)</h4>
+            ${ndcData.results.map((r) => `
+              <p class="live-row"><strong>${esc(r.brand_name)}</strong> (${esc(r.generic_name)}) · labeler: <strong>${esc(r.labeler_name)}</strong> · ${esc(r.active_ingredients ? r.active_ingredients.map((a) => a.name + ' ' + a.strength).join(', ') : '')} · ${esc(r.dosage_form)} · marketing: ${esc(r.marketing_start_date)}–${esc(r.marketing_end_date)}</p>`).join('')}
+            <p class="recs-note">The NDC confirms product and labeler — not the factory that made your bottle.</p>
+          </div>`;
+      } else {
+        identityHtml = `<div class="live-card"><h4>NDC Directory</h4><p class="live-row">No matching records found in this query. (That means the query found nothing — not that the product doesn't exist. Check the NDC on the label.)</p></div>`;
+      }
+    }
+
+    // Recalls: query by generic name via harmonized annotation, fall back to product description
+    let rec = await fdaFetch(`drug/enforcement.json?search=openfda.generic_name:"${encodeURIComponent(genericName)}"&sort=report_date:desc&limit=5`);
+    if (rec.error) {
+      rec = await fdaFetch(`drug/enforcement.json?search=product_description:"${encodeURIComponent(name)}"&sort=report_date:desc&limit=5`);
+    }
+    if (rec.error) {
+      liveResults.innerHTML = identityHtml + '<p class="live-status is-error">FDA API error (' + rec.error + ') — a source failure, not "no findings". Try again shortly.</p>';
+      return;
+    }
+
+    let recallsHtml;
+    if (rec.notFound) {
+      recallsHtml = `<div class="live-card"><h4>Recall enforcement reports</h4><p class="live-row">No matching records found in this query — which is not the same as "no recalls exist anywhere". Coverage: drug enforcement reports indexed by openFDA, matched on ${isNdc ? 'generic name for that NDC' : 'the name you entered'}.</p></div>`;
+    } else {
+      recallsHtml = `
+        <div class="live-card">
+          <h4>Recall enforcement reports (real, most recent first)</h4>
+          ${rec.results.map((r) => `
+            <div class="live-recall">
+              <p class="live-row"><strong>${esc(r.classification)}</strong> · ${esc(r.status)} · reported ${esc(r.report_date)} · recalling firm: <strong>${esc(r.recalling_firm)}</strong></p>
+              <p class="live-row">${esc(r.product_description)}</p>
+              <p class="live-row">Reason: ${esc(r.reason_for_recall)} · Lots/NDCs: ${esc(r.code_info)}</p>
+            </div>`).join('')}
+          <p class="recs-note">A recalling firm's name alone does not confirm your specific bottle is affected — check the lot number and NDC with your pharmacist. Verify applicability before drawing conclusions.</p>
+        </div>`;
+    }
+
+    liveResults.innerHTML = `
+      ${identityHtml}
+      ${recallsHtml}
+      <p class="recs-note">Source: FDA openFDA API (api.fda.gov), queried ${new Date().toLocaleString()}. Real regulatory records — never scored, ranked, or mixed into the mock index. openFDA's own disclaimer: results are unvalidated; do not rely on them alone for medical decisions.</p>`;
+  } catch (err) {
+    liveResults.innerHTML = '<p class="live-status is-error">Could not reach the FDA API (network or CORS failure). This is a source failure — not "no findings". You can search the same records at open.fda.gov.</p>';
+  }
+}
+
+liveForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = liveInput.value;
+  if (q.trim().length === 0) { liveInput.focus(); return; }
+  runLiveCheck(q);
 });
