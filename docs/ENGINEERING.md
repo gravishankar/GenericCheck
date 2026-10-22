@@ -135,15 +135,22 @@ gradeItem(product)
 7. `escapeHtml()` on every interpolation of user/API data (validated: injection test).
 8. `NDC_PATTERN = /^\d{10,11}$/` gate before any lookup; unsupported payloads render a safe message.
 
-## 6. Live FDA check
+## 6. Live regulatory check (openFDA + Rx Inspector data)
 
-Client-side `fetch` to `https://api.fda.gov`:
+Three record sources, rendered client-side, **records only — never scored, badged, or judged**:
 
-- `drug/ndc.json` — identity lookup. **Gotcha:** openFDA indexes NDCs in *dashed* format; the lookup tries raw-as-typed, dashed package NDC, and product NDC before concluding "no match". Recall lookups by generic name use the *resolved* generic name from an NDC hit, not the raw input (past bug).
-- `drug/enforcement.json` — recall records, queried via harmonized `openfda.generic_name`, sorted by `report_date:desc`.
-- 404 = "no matching records" (rendered with honest wording); non-404 errors = source failure (rendered as such).
+- `drug/ndc.json` (openFDA) — identity lookup. **Gotcha:** openFDA indexes NDCs in *dashed* format; the lookup tries raw-as-typed, dashed package NDC, and product NDC before concluding "no match". Recall lookups by generic name use the *resolved* generic name from an NDC hit, not the raw input (past bug).
+- `drug/enforcement.json` (openFDA) — recall records via harmonized `openfda.generic_name`, sorted by `report_date:desc`. 404 = "no matching records" (honest wording); non-404 errors = source failure.
+- **Rx Inspector data release** (ProPublica, CC BY-NC 4.0) — registered manufacturing facilities per product NDC. `ndc_fei.csv` (~3 MB, 47k rows) is fetched once per visit from GitHub raw, parsed with `parseCsv()` (state machine — registrant names contain quoted commas), indexed into a `Map` by product NDC, cached in memory. Product-NDC candidates are derived from dashed or bare-digit input (NDC segment ambiguity is handled by trying all plausible splits). Facility records render with linkage-method glosses, the registrant ≠ labeler caveat, a link out to Rx Inspector for inspection histories, the release vintage (currently hard-coded `RX_RELEASE_VINTAGE = 'November 2025'` — update on new releases), and the attribution footer (license obligation). A second `escapeHtml` pass covers all CSV fields — external data is untrusted input.
 
-Rate limits: 240 req/min with a free API key, 40/min without. The monthly report queries sequentially per medicine — keep lists ≤ 10 meds or add throttling.
+Attribution obligations on every result + site footer: FDA (public domain/CC0) + ProPublica (CC BY-NC 4.0, noncommercial only — the app must stay free).
+
+Rate limits: 1,000 req/day per IP without an openFDA key (240/min), 120,000/day with a free key. The monthly report queries sequentially per medicine — keep lists ≤ 10 meds or add throttling.
+
+### Camera scanning (two decode paths)
+
+- **Native path:** `BarcodeDetector` (Chrome/Edge) — feature-detected; `getUserMedia` with rear camera; `detect()` loop.
+- **Software fallback:** browsers without `BarcodeDetector` (notably iOS Safari) load [ZXing](https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js) from a CDN on first camera start (`startCameraZxing()` → `BrowserMultiFormatReader.decodeFromConstraints`), which manages the camera itself. `stopCamera()` must reset both paths (ZXing `reader.reset()` + stream stop). First use needs an internet connection on fallback browsers — disclosed in the UI. A camera-unavailable failure and a blocked-CDN failure render different honest messages.
 
 ## 7. Medicine lists (local-first)
 
@@ -173,6 +180,7 @@ Patterns that worked (recreate as needed; they live in /tmp in the original buil
 - **Scoring tests (Node):** eval `data.js` + `app.js` + assertions in one `eval` scope (separate evals can't share `const` scope); stub `document` with a Proxy. Assert the invariants in §5 against the fixtures.
 - **Browser QA (Playwright):** run against `file://` for full flows (works because openFDA allows cross-origin browser requests). Key techniques:
   - Stub camera: `page.addInitScript` / `evaluate` defining a fake `BarcodeDetector` (empty `detect()` loop) → exercises the permission-failure and unsupported paths.
+  - Fake camera (real ZXing path): launch Chromium with BOTH `--use-fake-device-for-media-stream` AND `--use-fake-ui-for-media-stream` — the second flag auto-grants the permission prompt; without it, getUserMedia fails with NotAllowedError and can be mistaken for a file:// restriction (a past harness lesson: verify suspected platform blocks with corrected flags before documenting them).
   - Simulate blocked storage: `addInitScript` redefining `window.localStorage` with a throwing getter.
   - Downloads: `Promise.all([page.waitForEvent('download'), page.click(...)])`.
   - HTML-injection check: submit `<img src=x onerror=…>` payloads and assert no `img` lands in the DOM.
@@ -200,9 +208,9 @@ All of these are browser-callable (CORS-open) or downloadable:
 - **i18n**: strings are currently inline; extract to a dictionary keyed per section.
 - **Backend for sync** (if ever requested): would break the local-first privacy model — require an explicit product decision, and keep export/import files working regardless.
 
-## 11. Real-data bridge — risk profile (analysis for a future build)
+## 11. Real-data bridge — risk profile (implemented)
 
-The candidate upgrade: for any real NDC, surface real quality signals — openFDA recall records + the registered factory's inspection history from ProPublica's Rx Inspector data release — mapped onto the same criteria as evidence cards, with **no composite 0–100 score for real companies**. Risk profile as verified October 2026:
+The shipped design: for any real NDC, surface real quality signals — openFDA recall records + the registered factory's inspection history from ProPublica's Rx Inspector data release — mapped onto the same criteria as evidence cards, with **no composite 0–100 score for real companies**. Risk profile as verified October 2026:
 
 ### Licensing
 - **openFDA (FDA):** data is public domain under a CC0 1.0 dedication — copy, modify, distribute, even commercially ([openFDA license](https://open.fda.gov/license/)). Attribution is *requested*, not required ("Data provided by the U.S. Food and Drug Administration (https://open.fda.gov)"). The *service* is "as is" with no warranties; FDA disclaims liability to the fullest extent ([terms](https://open.fda.gov/terms/)). When republishing data, keep openFDA's own disclaimer text visible (already rendered in the live check).
@@ -233,7 +241,7 @@ The candidate upgrade: for any real NDC, surface real quality signals — openFD
 
 ## 12. Known limitations
 
-- Physical camera scanning verified only via stubs (headless QA); real-device behavior depends on `BarcodeDetector` support.
+- Camera decode verified via stubs and (software path) a fake camera device; real-world iPhone scanning is the main untested path — typing the NDC is the designed fallback.
 - The hosted preview cannot persist lists (sandboxed iframe) — by design, mitigated by export/import.
 - `standalone.html` is a build artifact and can go stale if `scripts/build-standalone.py` isn't re-run.
 - Mock education content must remain sourced (MedlinePlus); mock fixtures must remain fictional and badged.

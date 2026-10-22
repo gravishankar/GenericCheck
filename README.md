@@ -28,14 +28,17 @@ GeneriCheck answers three practical questions about a generic medicine:
 
 ## Two ways to run the app
 
-| | Live preview (hosted) | Standalone file (download) |
-|---|---|---|
-| **What it is** | A link you open in any browser | A single HTML file you keep |
-| **Medicine lists** | Last for the visit — use Export to save a backup file | Auto-save on your device |
-| **Camera scanning** | Works (in supported browsers) | Works (in supported browsers) |
-| **Best for** | Trying the app, one-off lookups | Ongoing monthly use by each person |
+It's the same app with the same features in both forms — the difference is where your medicine list lives and how you get updates.
 
-Both versions are identical in features. The only difference is where your medicine list lives: the hosted preview runs in a restricted environment that cannot save between visits, while the standalone file saves automatically wherever you run it.
+| | Hosted preview ("GeneriCheck — Generic drug quality explorer") | Standalone file (`genericheck-standalone.html`) |
+|---|---|---|
+| **What it is** | A link you open in any browser | A single HTML file you download and keep |
+| **Medicine lists** | Last for the visit — use Export to save a backup file, Import to restore | Auto-save on the device where you run the file |
+| **Updates** | Automatic — the hosted copy is redeployed when the app changes | Frozen — replace the file to get updates |
+| **Internet needed** | Yes (it's a website) | Only for live FDA lookups and facility data; the app itself runs offline |
+| **Best for** | Trying the app, one-off lookups, iPhone scanning (hosted pages get the smoothest camera behavior) | Ongoing monthly use by each person — family, friends, anyone you share the file with |
+
+**Rule of thumb:** try the hosted link first; if someone will use the monthly workflow regularly, give them the standalone file and their calendar reminder — their list then lives on their own device with no account, and nothing about them is stored anywhere else.
 
 ## Quick start
 
