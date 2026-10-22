@@ -3,18 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FixIndex — Repairability scanner</title>
-  <meta name="description" content="Scan a product barcode and get a transparent 0–100 repairability score for consumer electronics, with risk flags and better alternatives.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230d5c4a'/%3E%3Crect x='9' y='14.5' width='14' height='3' rx='1.5' fill='%23faf9f5'/%3E%3C/svg%3E">
+  <title>GeneriCheck — Generic drug quality explorer</title>
+  <meta name="description" content="Scan or type an NDC to see which company makes a generic drug, an illustrative quality-signal score, and sourced education about the medicine. Educational prototype with fictional data.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230d5c63'/%3E%3Crect x='9' y='14.5' width='14' height='3' rx='1.5' fill='%23faf9f5'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://api.fontshare.com">
   <link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700&display=swap" rel="stylesheet">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="disclaimer-bar" role="note">
+    <p>
+      Educational prototype — every manufacturer, NDC, event, and score below is fictional and for
+      teaching only. Not medical advice. <strong>Do not stop or change any prescribed medication
+      based on this tool</strong> — talk to your pharmacist or prescriber.
+    </p>
+  </div>
 
   <header class="site-header">
     <div class="header-inner">
@@ -23,7 +28,7 @@
           <circle cx="16" cy="16" r="14" fill="var(--accent)"/>
           <rect x="9" y="14.5" width="14" height="3" rx="1.5" fill="var(--surface)"/>
         </svg>
-        <span>FixIndex</span>
+        <span>GeneriCheck</span>
       </a>
       <button class="btn btn-ghost" id="methodologyBtn" type="button">How scoring works</button>
     </div>
@@ -31,22 +36,23 @@
 
   <main id="main">
     <section class="intro" aria-labelledby="introTitle">
-      <h1 id="introTitle">Scan it. Fix it.</h1>
+      <h1 id="introTitle">Who makes your generic?</h1>
       <p class="intro-lede">
-        Point your camera at a product barcode — or type the code — and FixIndex
-        grades how repairable the device is, from 0 to 100, and shows you the
-        numbers behind the grade.
+        The same medicine is made by many companies, and their regulatory track records differ.
+        Scan the barcode on the package — or type the NDC printed on the label — to see which
+        company it points to, an illustrative quality-signal score, and sourced education about
+        the medicine itself.
       </p>
       <p class="demo-note">
-        Prototype on a mock database: 14 fictional products with illustrative
-        scores. Nothing here rates a real device.
+        Prototype on a mock database: 15 fictional products from six fictional "Demo Labs"
+        manufacturers across 7 common generics. Nothing here rates a real product or company.
       </p>
     </section>
 
     <section class="scanner-card" aria-label="Product lookup">
       <div class="tab-row" role="tablist" aria-label="Lookup method">
         <button class="tab" id="tabScan" role="tab" aria-selected="true" aria-controls="scanPanel" type="button">Scan barcode</button>
-        <button class="tab" id="tabManual" role="tab" aria-selected="false" aria-controls="manualPanel" type="button">Type a code</button>
+        <button class="tab" id="tabManual" role="tab" aria-selected="false" aria-controls="manualPanel" type="button">Type the NDC</button>
       </div>
 
       <div class="tab-panel" id="scanPanel" role="tabpanel" aria-labelledby="tabScan">
@@ -54,7 +60,7 @@
           <video id="scanVideo" playsinline muted></video>
           <div class="scan-frame" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
           <div class="video-idle" id="videoIdle">
-            <p id="scanSupportNote" class="video-idle-note">Camera stays off until you start it.</p>
+            <p id="scanSupportNote" class="video-idle-note">Many US drug packages carry a barcode that encodes the NDC. If a scan doesn't match, type the NDC printed on the label.</p>
             <button class="btn btn-primary" id="startCameraBtn" type="button">Start camera</button>
           </div>
         </div>
@@ -64,17 +70,17 @@
 
       <div class="tab-panel" id="manualPanel" role="tabpanel" aria-labelledby="tabManual" hidden>
         <form class="manual-form" id="manualForm">
-          <label class="field-label" for="codeInput">Product barcode</label>
+          <label class="field-label" for="codeInput">NDC from the package</label>
           <div class="manual-row">
             <input id="codeInput" class="code-input" name="code" inputmode="numeric" autocomplete="off"
-                   placeholder="e.g. 4260221450033" spellcheck="false">
+                   placeholder="e.g. 90909-0011-10" spellcheck="false">
             <button class="btn btn-primary" type="submit">Look up</button>
           </div>
         </form>
       </div>
 
       <div class="samples">
-        <p class="samples-label">Try a sample code</p>
+        <p class="samples-label">Try a sample NDC</p>
         <div class="chip-row" id="chipRow"></div>
       </div>
     </section>
@@ -83,21 +89,22 @@
 
     <section class="catalog" aria-labelledby="catalogTitle">
       <h2 id="catalogTitle">Mock catalog</h2>
-      <p class="catalog-note">All 14 products in the prototype database. Tap any card to grade it.</p>
+      <p class="catalog-note">All 15 fictional products in the prototype database. Tap any card to grade it.</p>
       <div class="catalog-grid" id="catalogGrid"></div>
     </section>
   </main>
 
   <footer class="site-footer">
     <p>
-      FixIndex is a prototype that adapts the published scoring model of the
-      <a href="https://yuka.io" target="_blank" rel="noopener">Yuka</a> app
-      (weighted criteria, hazard caps, same-category alternatives) to consumer
-      electronics repairability. Yuka is not affiliated with this prototype.
-      Methodology sources:
-      <a href="https://yuka.io/wp-content/uploads/Presskit-Yuka.pdf" target="_blank" rel="noopener">Yuka presskit</a>,
-      <a href="https://www.wired.com/story/yuka-app/" target="_blank" rel="noopener">Wired</a>,
-      <a href="https://www.foodnavigator.com/Article/2022/08/10/Five-years-of-Yuka-Co-founder-talks-strategy-impact-and-evolution-of-food-scanning-app/" target="_blank" rel="noopener">FoodNavigator</a>.
+      GeneriCheck is an educational prototype that adapts the published scoring model of the
+      <a href="https://yuka.io" target="_blank" rel="noopener">Yuka</a> app (weighted criteria,
+      hazard caps, same-category alternatives) to generic-drug manufacturer quality signals.
+      Yuka is not affiliated with this prototype; no Yuka code or data was used.
+      Regulatory definitions are drawn from the
+      <a href="https://www.fda.gov/inspections-compliance-enforcement-and-criminal-investigations/inspection-basics/inspection-classifications" target="_blank" rel="noopener">FDA's inspection classifications</a>,
+      <a href="https://www.fda.gov/safety/industry-guidance-recalls/recalls-background-and-definitions" target="_blank" rel="noopener">FDA recall classes</a>, and the
+      <a href="https://www.fda.gov/drugs/development-approval-process-drugs/orange-book-preface" target="_blank" rel="noopener">Orange Book preface</a>;
+      medication education from <a href="https://medlineplus.gov/druginfo/meds/a600045.html" target="_blank" rel="noopener">MedlinePlus</a>.
     </p>
   </footer>
 
@@ -106,44 +113,51 @@
       <button class="dialog-close" id="methodologyClose" type="button" aria-label="Close">✕</button>
       <h2 id="methodologyTitle">How the score works</h2>
       <p>
-        Every product is graded on five criteria, each scored 0–100. The final
-        index is their weighted sum, capped by serious repair barriers — the same
-        shape as Yuka's published food model (60% nutrition, 30% additives, 10%
-        organic, with hazard caps), adapted for repairability.
+        Each fictional product is graded on six quality signals, each 0–100. The index is their
+        weighted sum, capped by hard barriers — the same shape as Yuka's published food model
+        (60% nutrition, 30% additives, 10% organic, with hazard caps), applied here to
+        manufacturer track records. <strong>This is an illustrative teaching index, not an FDA
+        or WHO rating, and not a measure of clinical safety or effectiveness.</strong>
       </p>
       <table class="method-table">
         <caption class="sr-only">Scoring criteria and weights</caption>
-        <thead><tr><th scope="col">Criterion</th><th scope="col">Weight</th><th scope="col">What it measures</th></tr></thead>
+        <thead><tr><th scope="col">Signal</th><th scope="col">Weight</th><th scope="col">What it reflects</th></tr></thead>
         <tbody>
-          <tr><td>Repair documentation</td><td class="num">25%</td><td>Free guides, teardowns and schematics</td></tr>
-          <tr><td>Spare parts availability</td><td class="num">25%</td><td>Official and third-party parts, fairly priced</td></tr>
-          <tr><td>Ease of disassembly</td><td class="num">20%</td><td>Standard fasteners, modular design, little adhesive</td></tr>
-          <tr><td>Battery serviceability</td><td class="num">15%</td><td>Replacing the battery without special tools or risk</td></tr>
-          <tr><td>Software support</td><td class="num">15%</td><td>Pledged years of OS and security updates ÷ 7</td></tr>
+          <tr><td>Inspection record</td><td class="num">25%</td><td>Recent FDA outcomes: NAI (no action), VAI (voluntary fixes), OAI (regulatory action)</td></tr>
+          <tr><td>Recall history</td><td class="num">20%</td><td>FDA recall classes I (most serious), II, III</td></tr>
+          <tr><td>Batch consistency</td><td class="num">20%</td><td>Potency and dissolution variability across batches</td></tr>
+          <tr><td>Supply reliability</td><td class="num">15%</td><td>Shortage history — relevant because switches between makers are common</td></tr>
+          <tr><td>Quality transparency</td><td class="num">10%</td><td>Voluntarily published quality data</td></tr>
+          <tr><td>Bioequivalence record</td><td class="num">10%</td><td>Therapeutic-equivalence evidence (Orange Book AB ratings)</td></tr>
         </tbody>
       </table>
       <h3>Barrier caps</h3>
       <p>
-        A <strong>severe barrier</strong> (e.g. serialized parts that stop working after
-        replacement) caps the score at <strong>24</strong>. A <strong>major barrier</strong>
-        (e.g. a battery glued into the frame) caps it at <strong>49</strong>. Minor
-        flaws appear as amber risk cards without capping.
+        Severe barriers — a <strong>Class I recall</strong> (reasonable probability of serious
+        harm), an <strong>OAI inspection</strong>, or an <strong>active import alert</strong> — cap
+        the index at <strong>24</strong>. Major barriers — a <strong>Class II recall</strong> or an
+        open <strong>NTI bioequivalence question</strong> — cap it at <strong>49</strong>.
+        Events are scoped to specific sites, lots, and dates; a resolved historical event is
+        context, not proof of a current problem. Unassessed signals are excluded and weights are
+        re-normalized — missing evidence is never silently penalized or rewarded.
       </p>
       <h3>Badges</h3>
       <ul class="badge-legend">
-        <li><span class="dot dot-green" aria-hidden="true"></span>70–100 — Repair-friendly</li>
-        <li><span class="dot dot-yellow" aria-hidden="true"></span>40–69 — Mixed repairability</li>
-        <li><span class="dot dot-red" aria-hidden="true"></span>0–39 — Repair-hostile</li>
+        <li><span class="dot dot-green" aria-hidden="true"></span>70–100 — Strong quality signals</li>
+        <li><span class="dot dot-yellow" aria-hidden="true"></span>40–69 — Mixed quality signals</li>
+        <li><span class="dot dot-red" aria-hidden="true"></span>0–39 — Serious quality concerns</li>
       </ul>
       <h3>Alternatives</h3>
       <p>
-        When a product scores below <strong>60</strong>, FixIndex suggests up to three
-        higher-scoring products in the same subcategory — independent picks,
-        ordered by score.
+        Below <strong>60</strong>, the app lists up to three labelers of the <strong>same active
+        ingredient, strength, and form</strong> with higher scores. They are candidates to discuss
+        with your pharmacist — never instructions to switch on your own. Substitution rules vary
+        by state and by drug (especially narrow-therapeutic-index drugs like levothyroxine and
+        warfarin, where a manufacturer switch may prompt a TSH or INR recheck).
       </p>
       <p class="methodology-provenance">
-        Provenance: documentation-based adaptation. No Yuka code or data was
-        reverse-engineered; only its publicly described methodology was used.
+        Provenance: documentation-based adaptation. Manufacturer fixtures are fictional; regulatory
+        definitions come from FDA pages linked in the footer; medication education from MedlinePlus.
       </p>
     </article>
   </dialog>

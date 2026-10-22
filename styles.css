@@ -13,18 +13,18 @@
   --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem;
   --space-12: 3rem; --space-16: 4rem;
 
-  /* Workshop palette — warm paper, deep repair green */
-  --bg: #f4f3ee;
-  --surface: #faf9f5;
+  /* Clinical palette — cool paper, deep teal */
+  --bg: #f3f5f5;
+  --surface: #fafbfb;
   --surface-2: #ffffff;
-  --surface-offset: #ebe9e2;
-  --ink: #23211b;
-  --muted: #6f6d64;
-  --faint: #a5a294;
-  --border: #ded9cf;
-  --accent: #0d5c4a;
-  --accent-ink: #0a4437;
-  --accent-soft: #e2ece7;
+  --surface-offset: #e9eeee;
+  --ink: #1f2527;
+  --muted: #667073;
+  --faint: #a1aaaa;
+  --border: #d8e0e0;
+  --accent: #0d5c63;
+  --accent-ink: #0a4249;
+  --accent-soft: #dfecee;
 
   /* Traffic lights (scores only) */
   --green: #2c7a3f; --green-soft: #e0eede;
@@ -37,7 +37,7 @@
   --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
 
   --font-body: 'Switzer', 'Helvetica Neue', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SFMono-Regular', monospace;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
 }
 
 /* ---- Base ---- */
@@ -395,7 +395,7 @@ dialog {
   box-shadow: var(--shadow-lg);
 }
 dialog::backdrop { background: rgba(35, 33, 27, 0.5); }
-.methodology { padding: var(--space-8); position: relative; max-height: 85dvh; overflow: auto; }
+.methodology { padding: var(--space-8) var(--space-8) var(--space-12); position: relative; max-height: 85dvh; overflow: auto; }
 .methodology h2 { font-size: var(--text-lg); margin-bottom: var(--space-4); }
 .methodology h3 { font-size: var(--text-sm); font-weight: 700; margin: var(--space-5) 0 var(--space-2); }
 .methodology p { font-size: var(--text-sm); color: var(--muted); }
@@ -414,6 +414,90 @@ dialog::backdrop { background: rgba(35, 33, 27, 0.5); }
 .badge-legend { list-style: none; display: grid; gap: var(--space-2); font-size: var(--text-sm); }
 .badge-legend li { display: flex; align-items: center; gap: var(--space-2); }
 .badge-legend .dot { width: 10px; height: 10px; }
+
+/* Disclaimer bar */
+.disclaimer-bar {
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+}
+.disclaimer-bar p {
+  max-width: 820px; margin: 0 auto;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-xs); color: var(--accent-ink);
+}
+
+/* Mock badge */
+.mock-badge {
+  flex: none;
+  font-size: var(--text-xs); font-weight: 600;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-2);
+}
+
+/* Identity section */
+.identity {
+  margin-top: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.identity h3 { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
+.identity-ndc {
+  font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 700;
+  letter-spacing: 0.04em; margin-bottom: var(--space-2);
+}
+.ndc-seg { background: var(--accent-soft); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); }
+
+/* Dial + bar tier colors */
+.dial-fill.tier-green { stroke: var(--green); }
+.dial-fill.tier-yellow { stroke: var(--amber); }
+.dial-fill.tier-red { stroke: var(--red); }
+.bar-fill.tier-green { background: var(--green); }
+.bar-fill.tier-yellow { background: var(--amber); }
+.bar-fill.tier-red { background: var(--red); }
+.bar-unassessed {
+  background: repeating-linear-gradient(45deg, var(--surface-offset), var(--surface-offset) 6px, var(--surface-2) 6px, var(--surface-2) 12px);
+}
+.not-assessed-val { color: var(--faint); font-size: var(--text-xs); }
+
+/* Documented events */
+.event-list { list-style: none; display: grid; gap: var(--space-2); }
+.event-item {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+}
+.event-kind { font-weight: 700; }
+.event-meta { color: var(--muted); }
+
+/* Medication education */
+.edu {
+  margin-top: var(--space-8);
+  padding: var(--space-5);
+  background: var(--surface-offset);
+  border-radius: var(--radius-lg);
+}
+.edu h3 { font-size: var(--text-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.edu-sub { font-size: var(--text-sm); color: var(--muted); margin: var(--space-2) 0 var(--space-4); }
+.edu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.edu-card {
+  background: var(--surface-2); border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+.edu-card h4 { font-size: var(--text-sm); margin-bottom: var(--space-2); }
+.edu-card p { font-size: var(--text-sm); color: var(--muted); }
+.nti-callout {
+  margin-top: var(--space-4);
+  background: var(--amber-soft); color: var(--amber);
+  border-radius: var(--radius-md);
+  padding: var(--space-4); font-size: var(--text-sm);
+}
+.nti-callout strong { color: inherit; }
 
 /* ---- Small screens ---- */
 @media (max-width: 480px) {
