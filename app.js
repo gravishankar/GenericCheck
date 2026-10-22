@@ -707,7 +707,7 @@ liveForm.addEventListener('submit', (e) => {
 });
 
 /* ============ Medicine lists & monthly reminders (local-first) ============
-   No backend: lists live in the person's own browser (localStorage when
+   No backend: lists live in the person's own browser (device storage when
    available, with export/import to a JSON file as the portable backup).
    The only network calls go to the FDA's public openFDA API with the drug
    names being checked — names and emails never leave the device except
@@ -715,32 +715,20 @@ liveForm.addEventListener('submit', (e) => {
 
 const STORE_KEY = 'genericheck-medlists-v1';
 
-function storageAvailable() {
-  try {
-    const k = '__gc_test__';
-    window.localStorage.setItem(k, '1');
-    window.localStorage.removeItem(k);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/* Storage adapter. The deployed preview runs in a sandboxed iframe where browser
+   storage is unavailable, so lists live in memory there with export/import files
+   as the portable backup. The single-file version of this app ships a GC_STORAGE
+   adapter (defined before this script) that auto-saves on the person's device. */
 
-function readListsLocal() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(STORE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+const storageAdapter = (window.GC_STORAGE && typeof window.GC_STORAGE.read === 'function') ? window.GC_STORAGE : null;
 
-function saveListsLocal(lists) {
+function adapterRead() {
+  if (!storageAdapter) return null;
   try {
-    window.localStorage.setItem(STORE_KEY, JSON.stringify(lists));
-    return true;
+    const parsed = JSON.parse(storageAdapter.read(STORE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -752,8 +740,18 @@ const medListsEl = document.getElementById('medLists');
 const medReportEl = document.getElementById('medReport');
 const mlStorageNote = document.getElementById('mlStorageNote');
 
-let canStore = storageAvailable();
-let lists = readListsLocal();
+let canStore = !!adapterRead() || !!storageAdapter;
+let lists = adapterRead() || [];
+
+function persistLists() {
+  if (!storageAdapter) return false;
+  try {
+    storageAdapter.write(STORE_KEY, JSON.stringify(lists));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function refreshStorageNote() {
   if (canStore) {
@@ -851,8 +849,7 @@ medListForm.addEventListener('submit', (e) => {
   }
   const list = { id: crypto.randomUUID(), ...parsed, createdAt: new Date().toISOString() };
   lists.push(list);
-  canStore = saveListsLocal(lists) && canStore;
-  if (!canStore) refreshStorageNote();
+  canStore = persistLists() || canStore;
   mlStatus.textContent = `Saved ${escapeHtml(list.personName)}'s medicine list (${list.meds.length} medicine${list.meds.length > 1 ? 's' : ''}) — on this device only.`;
   mlStatus.classList.remove('is-error');
   medListForm.reset();
@@ -892,8 +889,7 @@ document.getElementById('mlImportFile').addEventListener('change', (e) => {
       for (const v of valid) {
         if (!existingIds.has(v.id || '')) { lists.push({ id: v.id || crypto.randomUUID(), ...v, createdAt: v.createdAt || new Date().toISOString() }); added++; }
       }
-      canStore = saveListsLocal(lists) && canStore;
-      if (!canStore) refreshStorageNote();
+      canStore = persistLists() || canStore;
       mlStatus.textContent = `Imported ${added} medicine list${added === 1 ? '' : 's'} from the file — on this device only.`;
       mlStatus.classList.remove('is-error');
       renderMedLists();
@@ -955,7 +951,7 @@ function removeList(btn) {
     return;
   }
   lists = lists.filter((l) => l.id !== btn.dataset.id);
-  saveListsLocal(lists);
+  persistLists();
   renderMedLists();
   medReportEl.hidden = true;
 }
