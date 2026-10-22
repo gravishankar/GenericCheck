@@ -705,3 +705,245 @@ liveForm.addEventListener('submit', (e) => {
   if (q.trim().length === 0) { liveInput.focus(); return; }
   runLiveCheck(q);
 });
+
+/* ============ Medicine lists & monthly reminders ============
+   Multi-person med lists saved to the app's backend, a server-generated
+   monthly report (real openFDA queries, server-side), a recurring calendar
+   reminder (.ics), and an email handoff (mailto) — the app itself cannot
+   send email, and says so plainly. */
+
+const API_BASE = '__PORT_5000__'.startsWith('__') ? '' : '__PORT_5000__';
+
+const medListForm = document.getElementById('medListForm');
+const mlMedRows = document.getElementById('mlMedRows');
+const mlAddRow = document.getElementById('mlAddRow');
+const mlStatus = document.getElementById('mlStatus');
+const medListsEl = document.getElementById('medLists');
+const medReportEl = document.getElementById('medReport');
+
+function mlRowHtml(index) {
+  return `
+    <div class="ml-med-row" data-row="${index}">
+      <div class="ml-med-grid">
+        <div class="ml-med-field">
+          <label class="field-label" for="ml-drug-${index}">Drug</label>
+          <input id="ml-drug-${index}" class="code-input" placeholder="metformin" data-med="drug" aria-label="Drug name for medicine ${index + 1}">
+        </div>
+        <div class="ml-med-field">
+          <label class="field-label" for="ml-str-${index}">Strength</label>
+          <input id="ml-str-${index}" class="code-input" placeholder="500 mg" data-med="strength" aria-label="Strength for medicine ${index + 1}">
+        </div>
+        <div class="ml-med-field">
+          <label class="field-label" for="ml-maker-${index}">Maker on label</label>
+          <input id="ml-maker-${index}" class="code-input" placeholder="Hikma" data-med="maker" aria-label="Maker for medicine ${index + 1}">
+        </div>
+        <div class="ml-med-field">
+          <label class="field-label" for="ml-ndc-${index}">NDC (optional)</label>
+          <input id="ml-ndc-${index}" class="code-input" placeholder="0069-2110" data-med="ndc" aria-label="NDC for medicine ${index + 1}">
+        </div>
+      </div>
+      <button class="btn btn-ghost ml-remove" type="button" aria-label="Remove medicine ${index + 1}">Remove this medicine</button>
+    </div>`;
+}
+
+function addMedRow() {
+  const count = mlMedRows.querySelectorAll('.ml-med-row').length;
+  if (count >= 10) return;
+  mlMedRows.insertAdjacentHTML('beforeend', mlRowHtml(count));
+}
+
+addMedRow();
+addMedRow();
+
+mlAddRow.addEventListener('click', addMedRow);
+mlMedRows.addEventListener('click', (e) => {
+  const btn = e.target.closest('.ml-remove');
+  if (!btn) return;
+  const rows = mlMedRows.querySelectorAll('.ml-med-row');
+  if (rows.length <= 1) return;
+  btn.closest('.ml-med-row').remove();
+});
+
+function collectMedRows() {
+  return Array.from(mlMedRows.querySelectorAll('.ml-med-row'))
+    .map((row) => {
+      const get = (k) => row.querySelector(`[data-med="${k}"]`).value.trim();
+      return { drug: get('drug'), strength: get('strength'), maker: get('maker'), ndc: get('ndc') };
+    })
+    .filter((m) => m.drug.length > 0);
+}
+
+medListForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const personName = document.getElementById('mlName').value.trim();
+  const email = document.getElementById('mlEmail').value.trim();
+  const meds = collectMedRows();
+  mlStatus.textContent = 'Saving…';
+  mlStatus.classList.remove('is-error');
+  try {
+    const res = await fetch(API_BASE + '/api/lists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personName, email, meds }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      mlStatus.textContent = data.error || 'Could not save the list.';
+      mlStatus.classList.add('is-error');
+      return;
+    }
+    mlStatus.textContent = `Saved ${escapeHtml(personName)}'s medicine list (${meds.length} medicine${meds.length > 1 ? 's' : ''}).`;
+    medListForm.reset();
+    mlMedRows.innerHTML = '';
+    addMedRow();
+    addMedRow();
+    loadMedLists();
+  } catch (err) {
+    mlStatus.textContent = 'Could not reach the app server — the list was not saved.';
+    mlStatus.classList.add('is-error');
+  }
+});
+
+async function apiGet(path) {
+  const res = await fetch(API_BASE + path);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function loadMedLists() {
+  try {
+    const data = await apiGet('/api/lists');
+    renderMedLists(data.lists || []);
+  } catch (err) {
+    medListsEl.innerHTML = '<p class="live-status is-error">Could not load saved medicine lists (server unreachable).</p>';
+  }
+}
+
+function medCard(list) {
+  const meds = list.meds.map((m) => escapeHtml(m.drug)).join(', ');
+  return `
+    <div class="ml-card" data-id="${list.id}">
+      <div class="ml-card-head">
+        <div>
+          <span class="ml-name">${escapeHtml(list.personName)}</span>
+          ${list.email ? `<span class="ml-email">${escapeHtml(list.email)}</span>` : ''}
+        </div>
+        <span class="ml-count">${list.meds.length} medicine${list.meds.length > 1 ? 's' : ''}</span>
+      </div>
+      <p class="recs-note">${meds}</p>
+      <div class="ml-actions">
+        <button class="btn btn-primary ml-report-btn" data-id="${list.id}" type="button">Run monthly report</button>
+        <a class="btn btn-ghost" href="${API_BASE}/api/lists/${list.id}/ics" download>Calendar reminder (.ics)</a>
+        ${list.email ? `<button class="btn btn-ghost ml-mailto-btn" data-id="${list.id}" type="button">Email report</button>` : ''}
+        <button class="btn btn-ghost ml-delete-btn" data-id="${list.id}" type="button">Remove</button>
+      </div>
+    </div>`;
+}
+
+function renderMedLists(lists) {
+  if (!lists.length) {
+    medListsEl.innerHTML = '<p class="live-status">No medicine lists saved yet — add one above (one per person).</p>';
+    return;
+  }
+  medListsEl.innerHTML = lists.map(medCard).join('');
+}
+
+medListsEl.addEventListener('click', async (e) => {
+  const reportBtn = e.target.closest('.ml-report-btn');
+  const mailtoBtn = e.target.closest('.ml-mailto-btn');
+  const deleteBtn = e.target.closest('.ml-delete-btn');
+  if (reportBtn) runMonthlyReport(reportBtn.dataset.id);
+  if (mailtoBtn) emailReport(mailtoBtn.dataset.id);
+  if (deleteBtn) removeList(deleteBtn);
+});
+
+async function removeList(btn) {
+  if (btn.dataset.armed !== '1') {
+    btn.dataset.armed = '1';
+    btn.textContent = 'Confirm remove?';
+    setTimeout(() => { btn.dataset.armed = '0'; btn.textContent = 'Remove'; }, 4000);
+    return;
+  }
+  try {
+    await fetch(API_BASE + '/api/lists/' + btn.dataset.id, { method: 'DELETE' });
+    loadMedLists();
+    medReportEl.hidden = true;
+  } catch (err) {
+    mlStatus.textContent = 'Could not remove the list (server unreachable).';
+  }
+}
+
+function recallLine(r) {
+  return `
+    <div class="live-recall">
+      <p class="live-row"><strong>${escapeHtml(r.classification)}</strong> · ${escapeHtml(r.status)} · reported ${escapeHtml(r.reportDate)} · recalling firm: <strong>${escapeHtml(r.recallingFirm)}</strong></p>
+      <p class="live-row">${escapeHtml(r.product)}</p>
+      <p class="live-row">Reason: ${escapeHtml(r.reason)} · Lots/NDCs: ${escapeHtml(r.lots)}</p>
+    </div>`;
+}
+
+async function runMonthlyReport(id) {
+  medReportEl.hidden = false;
+  medReportEl.innerHTML = '<p class="live-status">Generating the monthly report — querying the FDA openFDA API for each medicine…</p>';
+  medReportEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const report = await apiGet('/api/lists/' + id + '/report');
+    const sections = report.meds.map((m) => {
+      const head = `
+        <h4>${escapeHtml(m.drug)}${m.strength ? ' ' + escapeHtml(m.strength) : ''}${m.maker ? ' — ' + escapeHtml(m.maker) : ''}${m.ndc ? ' · NDC ' + escapeHtml(m.ndc) : ''}</h4>`;
+      let body;
+      if (m.status === 'source-failure') {
+        body = '<p class="live-status is-error">Source unreachable (' + escapeHtml(m.error || 'error') + ') — a check failure, not "no findings". Re-run shortly.</p>';
+      } else if (m.status === 'no-matching-records') {
+        body = '<p class="live-row">No matching recall records found in this query — which is not the same as "no recalls exist anywhere". Coverage: drug enforcement reports indexed by openFDA, matched on the drug name.</p>';
+      } else {
+        body = (m.recalls || []).map(recallLine).join('') +
+          '<p class="recs-note">A recalling firm or drug name alone does not confirm this person\'s bottle is affected — check the lot number and NDC with the pharmacist.</p>';
+      }
+      return `<div class="live-card">${head}${body}</div>`;
+    }).join('');
+
+    medReportEl.innerHTML = `
+      <div class="result-card">
+        <div class="result-head">
+          <div class="result-id">
+            <p class="result-brand">Monthly medicine quality check</p>
+            <h2 class="result-name">${escapeHtml(report.personName)}</h2>
+            <p class="result-barcode">Generated ${new Date(report.generatedAt).toLocaleString()} · real FDA data — never scored</p>
+          </div>
+          <span class="mock-badge">Real data</span>
+        </div>
+        ${sections}
+        <ul class="checklist">
+          ${report.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}
+        </ul>
+      </div>`;
+  } catch (err) {
+    medReportEl.innerHTML = '<p class="live-status is-error">Could not generate the report (server or FDA API unreachable) — a source failure, not "no findings".</p>';
+  }
+}
+
+async function emailReport(id) {
+  try {
+    const report = await apiGet('/api/lists/' + id + '/report');
+    const lines = [`Monthly medicine quality check — ${report.personName}`, `Generated ${new Date(report.generatedAt).toLocaleString()}`, ''];
+    for (const m of report.meds) {
+      const label = `${m.drug}${m.strength ? ' ' + m.strength : ''}${m.maker ? ' (' + m.maker + ')' : ''}`;
+      if (m.status === 'ok') {
+        lines.push(`${label}: ${m.recalls.length} matching recall record(s) in openFDA — check lots with your pharmacist.`);
+        for (const r of m.recalls) lines.push(`  - ${r.classification}, ${r.status}, reported ${r.reportDate}, firm: ${r.recallingFirm}`);
+      } else if (m.status === 'no-matching-records') {
+        lines.push(`${label}: no matching recall records in this query (not the same as "no recalls exist").`);
+      } else {
+        lines.push(`${label}: source unreachable — re-run the check.`);
+      }
+    }
+    lines.push('', 'Never stop or change a medication on your own — discuss findings with your pharmacist or prescriber.');
+    const subject = `Monthly medicine quality check — ${report.personName}`;
+    window.location.href = 'mailto:' + encodeURIComponent(report.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(lines.join('\n'));
+  } catch (err) {
+    mlStatus.textContent = 'Could not build the email (server unreachable).';
+  }
+}
+
+loadMedLists();

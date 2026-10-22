@@ -108,6 +108,44 @@
       <div id="liveResults"></div>
     </section>
 
+    <section class="medlists" aria-labelledby="mlHeading">
+      <h2 id="mlHeading">Medicine lists & monthly reminders</h2>
+      <p class="catalog-note">
+        Save a medicine list for each person — from the label: drug, strength, maker, and the NDC if shown.
+        Then run the monthly check, download a recurring calendar reminder for each person, or hand the report
+        to their email. The app cannot send email by itself: use the email button (opens your email app with the
+        report), subscribe via the calendar file — or connect an email service and ask for a fully automated monthly delivery.
+      </p>
+
+      <form class="medlist-form" id="medListForm">
+        <div class="ml-person-row">
+          <div class="ml-field">
+            <label class="field-label" for="mlName">Person's name</label>
+            <input id="mlName" class="code-input" name="personName" autocomplete="off" placeholder="e.g. Meera" required>
+          </div>
+          <div class="ml-field">
+            <label class="field-label" for="mlEmail">Email for the monthly reminder (optional)</label>
+            <input id="mlEmail" class="code-input" name="email" type="email" autocomplete="off" placeholder="e.g. meera@example.com">
+          </div>
+        </div>
+        <div id="mlMedRows"></div>
+        <div class="ml-actions">
+          <button class="btn btn-ghost" id="mlAddRow" type="button">Add another medicine</button>
+          <button class="btn btn-primary" id="mlSubmit" type="submit">Save medicine list</button>
+        </div>
+        <p class="recs-note" id="mlStatus" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="medLists" class="ml-saved"></div>
+      <div id="medReport" hidden></div>
+
+      <p class="recs-note">
+        Storage disclosure: lists (including emails) are kept in this app's own local database. If the app is
+        redeployed, re-entry may be needed — keep your own copy of each list. This is not medical advice; never
+        stop or change a medication based on this tool — discuss findings with a pharmacist or prescriber.
+      </p>
+    </section>
+
     <section class="monitor" aria-labelledby="monitorHeading">
       <h2 id="monitorHeading">Monthly monitoring checklist</h2>
       <p class="catalog-note">This page doesn't monitor on its own — run these steps monthly for each medicine. A scheduled assistant task can do this for you if you share your med list.</p>
