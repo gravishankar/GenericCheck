@@ -430,6 +430,52 @@ function setScanError(message) {
   scanStatus.classList.add('is-error');
 }
 
+const ZXING_CDN = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('script load failed'));
+    document.head.appendChild(s);
+  });
+}
+
+let zxReader = null;
+
+/* Software decoder fallback for browsers without the native BarcodeDetector
+   API (notably iOS Safari). Loaded from a CDN on first use — note this means
+   the first scan needs an internet connection on those browsers. */
+async function startCameraZxing() {
+  scanStatus.textContent = 'Loading the software barcode decoder…';
+  try {
+    if (!window.ZXing) await loadScript(ZXING_CDN);
+  } catch (err) {
+    setScanError('Software decoder could not be loaded (offline or blocked). Type the NDC instead — sample codes are below.');
+    return;
+  }
+  try {
+    zxReader = new window.ZXing.BrowserMultiFormatReader();
+    await zxReader.decodeFromConstraints({ video: { facingMode: 'environment' } }, video, (result) => {
+      if (result) {
+        const value = result.getText();
+        stopCamera();
+        lookup(value);
+      }
+    });
+  } catch (err) {
+    stopCamera();
+    setScanError('Camera unavailable or permission denied. Type the NDC instead.');
+    return;
+  }
+  videoWrap.classList.add('is-live');
+  videoIdle.setAttribute('hidden', '');
+  startCameraBtn.hidden = true;
+  stopCameraBtn.hidden = false;
+  scanStatus.textContent = 'Scanning — hold the package barcode inside the frame';
+}
+
 async function startCamera() {
   scanStatus.textContent = '';
   scanStatus.classList.remove('is-error');
@@ -439,7 +485,7 @@ async function startCamera() {
     return;
   }
   if (!('BarcodeDetector' in window)) {
-    setScanError('This browser has no built-in barcode detection (Safari, for instance). Type the NDC instead — sample codes are below.');
+    await startCameraZxing();
     return;
   }
 
@@ -478,6 +524,10 @@ async function startCamera() {
 
 function stopCamera() {
   detecting = false;
+  if (zxReader) {
+    try { zxReader.reset(); } catch (err) { /* already stopped */ }
+    zxReader = null;
+  }
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -511,8 +561,7 @@ stopCameraBtn.addEventListener('click', stopCamera);
 
 (function checkSupport() {
   if (!('BarcodeDetector' in window)) {
-    scanSupportNote.textContent = 'This browser has no built-in barcode detection — type the NDC instead.';
-    startCameraBtn.hidden = true;
+    scanSupportNote.textContent = 'This browser has no built-in barcode detection (e.g. Safari) — the camera button will use a software decoder loaded on first use, which needs an internet connection the first time.';
   } else if (!window.isSecureContext) {
     scanSupportNote.textContent = 'Camera scanning needs a secure (https) context.';
     startCameraBtn.hidden = true;

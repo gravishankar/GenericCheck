@@ -52,7 +52,7 @@ No account, no sign-up, no installation.
 
 ### 1. Identify a product — scan or type
 
-- **Scan barcode** — uses your device camera and the browser's built-in barcode detection (works in Chrome and Edge on Android/desktop; not yet in Safari — the app detects this and tells you).
+- **Scan barcode** — uses your device camera. Chrome and Edge use the browser's built-in barcode detection; browsers without it (notably Safari on iPhone) automatically fall back to a software decoder loaded on first use, which needs an internet connection that once. Typing the NDC always works as the manual alternative.
 - **Type the NDC** — the 10–11 digit code on the label, with or without dashes.
 - The app also explains what the NDC identifies: the **labeler** (the company on the label — it may be the maker, or a repackager), the product, and the package. It deliberately does *not* claim to identify the factory.
 
@@ -146,7 +146,7 @@ Attribution is shown on every result and in the footer. Because the Rx Inspector
 - The **mock scoring is fictional** (fictional manufacturers, clearly badged). It teaches signal-reading; it does not rate real companies.
 - **Live FDA data is never scored or ranked** — deliberately.
 - "No matching records" means the query found nothing — not that a drug or factory is problem-free.
-- The camera scanner depends on a browser feature (`BarcodeDetector`) that Safari does not yet support; typing the NDC always works.
+- On iPhone/iPad, scanning uses a software decoder loaded from a CDN on first use (Safari lacks the native barcode API) — so the first scan needs an internet connection. Real-device camera behavior could not be fully verified in automated testing; typing the NDC always works.
 - The app cannot send email or run checks on a schedule by itself — the calendar file and email handoff are the honest mechanisms for that.
 
 ## Data sources
@@ -161,7 +161,7 @@ Attribution is shown on every result and in the footer. Because the Rx Inspector
 
 | Problem | What to do |
 |---|---|
-| Camera button missing | Your browser lacks built-in barcode detection (e.g. Safari) or the page isn't in a secure context. Type the NDC instead. |
+| Camera won't start | The page may not be in a secure context, the camera permission was denied, or (Safari) the software decoder couldn't load — check your connection and retry. Typing the NDC always works. |
 | "No matching records found" | The query found nothing — that's not "no recalls exist". Verify the drug name/NDC spelling. |
 | Lists disappeared after a visit (hosted preview) | Expected in the restricted preview. Use Export before leaving, or use the standalone file, which saves automatically. |
 | Monthly report shows a source failure | The FDA API was unreachable or rate-limited — wait a minute and re-run. This is a check failure, not "no findings". |
