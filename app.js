@@ -487,8 +487,10 @@ stopCameraBtn.addEventListener('click', stopCamera);
 (function checkSupport() {
   if (!('BarcodeDetector' in window)) {
     scanSupportNote.textContent = 'This browser has no built-in barcode detection — type the NDC instead.';
+    startCameraBtn.hidden = true;
   } else if (!window.isSecureContext) {
     scanSupportNote.textContent = 'Camera scanning needs a secure (https) context.';
+    startCameraBtn.hidden = true;
   }
 })();
 
