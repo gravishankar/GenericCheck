@@ -200,7 +200,38 @@ All of these are browser-callable (CORS-open) or downloadable:
 - **i18n**: strings are currently inline; extract to a dictionary keyed per section.
 - **Backend for sync** (if ever requested): would break the local-first privacy model — require an explicit product decision, and keep export/import files working regardless.
 
-## 11. Known limitations
+## 11. Real-data bridge — risk profile (analysis for a future build)
+
+The candidate upgrade: for any real NDC, surface real quality signals — openFDA recall records + the registered factory's inspection history from ProPublica's Rx Inspector data release — mapped onto the same criteria as evidence cards, with **no composite 0–100 score for real companies**. Risk profile as verified October 2026:
+
+### Licensing
+- **openFDA (FDA):** data is public domain under a CC0 1.0 dedication — copy, modify, distribute, even commercially ([openFDA license](https://open.fda.gov/license/)). Attribution is *requested*, not required ("Data provided by the U.S. Food and Drug Administration (https://open.fda.gov)"). The *service* is "as is" with no warranties; FDA disclaims liability to the fullest extent ([terms](https://open.fda.gov/terms/)). When republishing data, keep openFDA's own disclaimer text visible (already rendered in the live check).
+- **ProPublica Rx Inspector data:** Creative Commons **BY-NC 4.0** ([repo](https://github.com/propublica/rx-inspector-data)) — noncommercial use with attribution to ProPublica and a link back to Rx Inspector. Free educational app qualifies today; **if the app ever monetizes, this license breaks** — remove the dataset or negotiate. Note: ProPublica *articles* are CC BY-NC-ND (no derivatives) — use the dataset, not the journalism.
+
+### Accuracy & completeness (the real risk driver)
+- openFDA data is unvalidated by FDA's own statement; recall records are firm-reported and lag.
+- Rx Inspector links ~80% of generics to a factory ([methodology](https://www.propublica.org/article/rx-inspector-fda-generic-drug-tool-methodology)); inspection outcomes come from FDA's dashboard (2008+) plus records ProPublica obtained by suing FDA. Coverage gaps are structural.
+- The silent-switch problem applies to the *data*: an NDC→factory mapping can be stale the day a labeler shifts production. Any UI built on it must show data vintage and per-lookup coverage, and use "unconfirmed" states rather than inferring cleanliness.
+
+### Defamation / misrepresentation
+- Republishing official records verbatim (recall classifications, inspection outcomes): low risk — facts from government records.
+- Derivative judgments on real companies (traffic-light badges, composite scores computed from possibly-stale mappings): the highest-risk feature. A wrong "red" attached to a real company is a potentially false statement of fact. This is why the bridge design is **evidence panel, not scoring** — show records + criteria mapping + provenance, never a verdict number for real companies.
+
+### Endorsement & marks
+- Never use FDA or ProPublica logos; state "not affiliated with, endorsed by, or supported by" both. Don't imply FDA endorsement (FDA Website Policies).
+
+### Required disclaimer changes if the bridge is built
+1. Terms §4 (Third-party data): name both datasets, their licenses with links, and add explicit non-endorsement of FDA and ProPublica.
+2. Add data-vintage language: "information may be outdated or incomplete; absence of records is not evidence of absence."
+3. Attribution footer (CC BY-NC obligation): "Data provided by the U.S. Food and Drug Administration (open.fda.gov) · Rx Inspector data © ProPublica, used under CC BY-NC 4.0" with a link to Rx Inspector.
+4. Keep openFDA's verbatim disclaimer text on every panel that renders its data.
+5. README: add a data-licensing section mirroring the above.
+
+### Operational
+- openFDA rate limits (current): 240 req/min and **1,000 req/day per IP without a key**; 120,000/day with a free key. Fine for family use; get a key if the app grows.
+- Both datasets contain no PII; queries still carry only drug names.
+
+## 12. Known limitations
 
 - Physical camera scanning verified only via stubs (headless QA); real-device behavior depends on `BarcodeDetector` support.
 - The hosted preview cannot persist lists (sandboxed iframe) — by design, mitigated by export/import.
