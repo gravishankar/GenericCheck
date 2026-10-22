@@ -1093,3 +1093,13 @@ async function emailReport(id) {
   const subject = `Monthly medicine quality check — ${report.personName}`;
   window.location.href = 'mailto:' + encodeURIComponent(report.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(lines.join('\n'));
 }
+
+/* ============ Terms & Disclaimer dialog ============ */
+const termsDialog = document.getElementById('termsDialog');
+document.getElementById('termsBtn').addEventListener('click', () => termsDialog.showModal());
+document.getElementById('topTermsBtn').addEventListener('click', () => termsDialog.showModal());
+document.getElementById('footerTermsBtn').addEventListener('click', () => termsDialog.showModal());
+document.getElementById('termsClose').addEventListener('click', () => termsDialog.close());
+termsDialog.addEventListener('click', (e) => {
+  if (e.target === termsDialog) termsDialog.close();
+});

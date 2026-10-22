@@ -119,6 +119,16 @@ Therapeutic-equivalence status (Orange Book "AB") is shown as a categorical badg
 
 ---
 
+## Legal & disclaimers
+
+GeneriCheck keeps its legal notices visible at all times, in three layers:
+
+1. **A persistent red banner** fixed to the bottom of every screen, on every page, at every scroll position: *"Educational use only — not medical advice. Do not stop or change any medication based on this tool. Provided 'as is' — no warranty, no liability."* It cannot be dismissed.
+2. **The full Terms & Disclaimer dialog** — one tap from the banner, the top notice, or the footer — covering: educational purpose only; no medical, legal, or professional advice and no provider relationship of any kind; fictional data disclosure; third-party data (FDA openFDA, ProPublica, MedlinePlus) provided "as is" with no affiliation or endorsement; no reliance and no warranty; limitation of liability to the maximum extent permitted by law; user responsibility; privacy (no data collection); emergencies (call 911, not this app); and changes to the terms.
+3. **In-place notices on every result**: the fictional-data badge on mock scores, "never scored" labels on real FDA records, and pharmacist-consultation framing on every recommendation.
+
+GeneriCheck is an educational prototype and is not a substitute for professional judgment. If any information here conflicts with your prescriber's guidance, follow your prescriber.
+
 ## Honest limitations
 
 - The **mock scoring is fictional** (fictional manufacturers, clearly badged). It teaches signal-reading; it does not rate real companies.

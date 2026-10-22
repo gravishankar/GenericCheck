@@ -16,6 +16,7 @@
       Educational prototype — every manufacturer, NDC, event, and score below is fictional and for
       teaching only. Not medical advice. <strong>Do not stop or change any prescribed medication
       based on this tool</strong> — talk to your pharmacist or prescriber.
+      <button class="linklike" id="topTermsBtn" type="button">Full Terms & Disclaimer</button>
     </p>
   </div>
 
@@ -187,6 +188,11 @@
       <a href="https://www.fda.gov/drugs/development-approval-process-drugs/orange-book-preface" target="_blank" rel="noopener">Orange Book preface</a>;
       medication education from <a href="https://medlineplus.gov/druginfo/meds/a600045.html" target="_blank" rel="noopener">MedlinePlus</a>.
     </p>
+    <p>
+      GeneriCheck is provided for education only, "as is," without warranty of any kind, and without
+      liability for any claim arising from its use. See the full
+      <button class="linklike" id="footerTermsBtn" type="button">Terms & Disclaimer</button>.
+    </p>
   </footer>
 
   <dialog id="methodologyDialog" aria-labelledby="methodologyTitle">
@@ -260,6 +266,43 @@
       </p>
     </article>
   </dialog>
+
+  <dialog id="termsDialog" aria-labelledby="termsTitle">
+    <div class="dialog-scroll">
+      <h2 id="termsTitle">Terms & Disclaimer</h2>
+      <p class="recs-note">Last updated October 2026. By using GeneriCheck you acknowledge and accept these terms.</p>
+      <h3>1. Educational purpose</h3>
+      <p>GeneriCheck is an educational prototype designed to teach users how generic-drug quality signals work — NDC identification, regulatory records, scoring concepts, and questions to discuss with a pharmacist. It is not a medical device, a diagnostic tool, or a treatment tool.</p>
+      <h3>2. Not medical, legal, or professional advice</h3>
+      <p>Nothing in this app is medical, legal, or other professional advice, and using it creates no doctor–patient, pharmacist–patient, or attorney–client relationship of any kind. Always consult a licensed pharmacist, prescriber, or other qualified professional before making any decision about any medication.</p>
+      <h3>3. Fictional data</h3>
+      <p>Every manufacturer, NDC, event, and score in the mock catalog is fictional, clearly badged, and included for teaching only. The illustrative quality-signal index does not rate, rank, or evaluate any real company, product, or facility.</p>
+      <h3>4. Third-party data</h3>
+      <p>Live regulatory records come from the U.S. Food and Drug Administration's openFDA API and other public sources (including ProPublica's Rx Inspector and MedlinePlus). This app is not affiliated with, endorsed by, or supported by any of them. Third-party data is provided "as is" and may be incomplete, delayed, or inaccurate.</p>
+      <h3>5. No reliance and no warranty</h3>
+      <p>The app and all of its content are provided "as is" and "as available," without warranty of any kind, express or implied — including warranties of merchantability, fitness for a particular purpose, accuracy, and non-infringement. Do not rely on this app alone for any decision.</p>
+      <h3>6. Limitation of liability</h3>
+      <p>To the maximum extent permitted by applicable law, the authors and distributors of this app shall not be liable for any claim, damage, or loss — direct, indirect, incidental, consequential, punitive, or otherwise — arising from or relating to the use of, or inability to use, this app or its content. This includes, without limitation, decisions about medications, health outcomes, data loss, and device or software issues. Use of the app is entirely at the user's own risk.</p>
+      <h3>7. User responsibility</h3>
+      <p>You remain responsible for verifying all information against authoritative sources, and for all decisions made with or without the aid of this app. The app cannot send alerts on a schedule, cannot send email, and cannot monitor anything automatically.</p>
+      <h3>8. Privacy</h3>
+      <p>The app has no accounts, no server-side storage, no analytics, and no database. Medicine lists stay on the user's device. The only network requests go to the FDA's public API and carry only the drug names being checked. No name, email, or health information is ever uploaded.</p>
+      <h3>9. Emergencies</h3>
+      <p>In a medical emergency, call 911 (or your local emergency number) or go to the nearest emergency department. Do not use this app.</p>
+      <h3>10. Changes</h3>
+      <p>These terms may change. The version presented in the app at the time of use applies.</p>
+    </div>
+    <button class="dialog-close" id="termsClose" type="button" aria-label="Close">✕</button>
+  </dialog>
+
+  <div class="sticky-disclaimer" role="note">
+    <p>
+      <strong>Educational use only — not medical advice.</strong>
+      <span class="bar-full">Do not stop or change any medication based on this tool.</span>
+      Provided "as is" — no warranty, no liability.
+      <button class="linklike" id="termsBtn" type="button">Terms & Disclaimer</button>
+    </p>
+  </div>
 
   <script src="data.js"></script>
   <script src="app.js"></script>

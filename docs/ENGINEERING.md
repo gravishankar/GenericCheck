@@ -40,6 +40,7 @@ These principles are **load-bearing** — regressions against them are bugs even
 5. **Local-first PII.** No accounts, no server, no uploads. The only network calls carry drug names to the FDA's public API.
 6. **Never medical advice.** Alternatives are "candidates to discuss with your pharmacist"; the disclaimer bar and education copy enforce this everywhere.
 7. **Escape everything.** All user input and API data passes through `escapeHtml()` before reaching the DOM.
+8. **Legal notices are structural, not cosmetic.** The persistent disclaimer bar (`.sticky-disclaimer`, fixed, non-dismissible, present on every view and scroll position), the full Terms & Disclaimer dialog (`#termsDialog`), and the in-place notices (mock badge, "never scored" labels, pharmacist framing) are load-bearing. Any new user-facing section must keep these notices intact and must not weaken their wording. QA must verify: bar visible at top/mid/full scroll (desktop + mobile), dialog opens from all three entry points (`#termsBtn`, `#topTermsBtn`, `#footerTermsBtn`), and the mobile bar text fits (the `.bar-full` span is hidden under 640px so the bar stays ≤ 2 lines).
 
 ## 4. Data model (`data.js`)
 
