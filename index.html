@@ -112,9 +112,11 @@
       <h2 id="mlHeading">Medicine lists & monthly reminders</h2>
       <p class="catalog-note">
         Save a medicine list for each person — from the label: drug, strength, maker, and the NDC if shown.
+        Everything stays on this device: names and emails are never sent to or stored on any server we operate.
+        The only network requests are to the FDA's public API, carrying just the drug names being checked.
         Then run the monthly check, download a recurring calendar reminder for each person, or hand the report
-        to their email. The app cannot send email by itself: use the email button (opens your email app with the
-        report), subscribe via the calendar file — or connect an email service and ask for a fully automated monthly delivery.
+        to their email — the app cannot send email by itself; the email button opens the person's own email app
+        with the report drafted.
       </p>
 
       <form class="medlist-form" id="medListForm">
@@ -134,15 +136,24 @@
           <button class="btn btn-primary" id="mlSubmit" type="submit">Save medicine list</button>
         </div>
         <p class="recs-note" id="mlStatus" role="status" aria-live="polite"></p>
+        <p class="recs-note" id="mlStorageNote"></p>
+        <div class="ml-actions">
+          <button class="btn btn-ghost" id="mlExport" type="button">Export lists to a file</button>
+          <button class="btn btn-ghost" id="mlImport" type="button">Import from a file</button>
+          <input id="mlImportFile" type="file" accept="application/json,.json" hidden>
+        </div>
       </form>
 
       <div id="medLists" class="ml-saved"></div>
       <div id="medReport" hidden></div>
 
       <p class="recs-note">
-        Storage disclosure: lists (including emails) are kept in this app's own local database. If the app is
-        redeployed, re-entry may be needed — keep your own copy of each list. This is not medical advice; never
-        stop or change a medication based on this tool — discuss findings with a pharmacist or prescriber.
+        Privacy & storage: lists live in this browser's local storage on the device where they were entered —
+        they are never uploaded. The only data that leaves the device is what the user chooses to send: drug
+        names in FDA queries, and the calendar/email files they generate. If browser data is cleared, lists
+        are lost — use Export to keep a backup file. Prefer a copy of the app to run? Use the
+        <a href="standalone.html" download>downloadable single-file version</a>. This is not medical advice;
+        never stop or change a medication based on this tool — discuss findings with a pharmacist or prescriber.
       </p>
     </section>
 

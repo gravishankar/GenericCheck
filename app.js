@@ -706,13 +706,43 @@ liveForm.addEventListener('submit', (e) => {
   runLiveCheck(q);
 });
 
-/* ============ Medicine lists & monthly reminders ============
-   Multi-person med lists saved to the app's backend, a server-generated
-   monthly report (real openFDA queries, server-side), a recurring calendar
-   reminder (.ics), and an email handoff (mailto) — the app itself cannot
-   send email, and says so plainly. */
+/* ============ Medicine lists & monthly reminders (local-first) ============
+   No backend: lists live in the person's own browser (localStorage when
+   available, with export/import to a JSON file as the portable backup).
+   The only network calls go to the FDA's public openFDA API with the drug
+   names being checked — names and emails never leave the device except
+   through the actions the user chooses (calendar file, email handoff). */
 
-const API_BASE = '__PORT_5000__'.startsWith('__') ? '' : '__PORT_5000__';
+const STORE_KEY = 'genericheck-medlists-v1';
+
+function storageAvailable() {
+  try {
+    const k = '__gc_test__';
+    window.localStorage.setItem(k, '1');
+    window.localStorage.removeItem(k);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readListsLocal() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(STORE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveListsLocal(lists) {
+  try {
+    window.localStorage.setItem(STORE_KEY, JSON.stringify(lists));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const medListForm = document.getElementById('medListForm');
 const mlMedRows = document.getElementById('mlMedRows');
@@ -720,6 +750,40 @@ const mlAddRow = document.getElementById('mlAddRow');
 const mlStatus = document.getElementById('mlStatus');
 const medListsEl = document.getElementById('medLists');
 const medReportEl = document.getElementById('medReport');
+const mlStorageNote = document.getElementById('mlStorageNote');
+
+let canStore = storageAvailable();
+let lists = readListsLocal();
+
+function refreshStorageNote() {
+  if (canStore) {
+    mlStorageNote.textContent = 'This device allows browser storage — the list is saved automatically in this browser only. Use Export to keep a portable backup file.';
+  } else {
+    mlStorageNote.textContent = 'This preview environment blocks browser storage — the list lasts only for this visit. Use Export to save a copy as a file, and Import to restore it later. In the downloaded app on a normal device, saving works automatically.';
+  }
+}
+refreshStorageNote();
+
+function validList(body) {
+  if (!body || typeof body !== 'object') return null;
+  const personName = String(body.personName || '').trim().slice(0, 80);
+  const email = String(body.email || '').trim().slice(0, 120);
+  if (!personName) return null;
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return null;
+  const meds = Array.isArray(body.meds)
+    ? body.meds
+        .map((m) => ({
+          drug: String(m.drug || '').trim().slice(0, 60),
+          strength: String(m.strength || '').trim().slice(0, 40),
+          maker: String(m.maker || '').trim().slice(0, 60),
+          ndc: String(m.ndc || '').trim().slice(0, 20),
+        }))
+        .filter((m) => m.drug.length > 0)
+        .slice(0, 15)
+    : [];
+  if (meds.length === 0) return null;
+  return { personName, email, meds };
+}
 
 function mlRowHtml(index) {
   return `
@@ -773,51 +837,74 @@ function collectMedRows() {
     .filter((m) => m.drug.length > 0);
 }
 
-medListForm.addEventListener('submit', async (e) => {
+medListForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const personName = document.getElementById('mlName').value.trim();
-  const email = document.getElementById('mlEmail').value.trim();
-  const meds = collectMedRows();
-  mlStatus.textContent = 'Saving…';
-  mlStatus.classList.remove('is-error');
-  try {
-    const res = await fetch(API_BASE + '/api/lists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ personName, email, meds }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      mlStatus.textContent = data.error || 'Could not save the list.';
-      mlStatus.classList.add('is-error');
-      return;
-    }
-    mlStatus.textContent = `Saved ${escapeHtml(personName)}'s medicine list (${meds.length} medicine${meds.length > 1 ? 's' : ''}).`;
-    medListForm.reset();
-    mlMedRows.innerHTML = '';
-    addMedRow();
-    addMedRow();
-    loadMedLists();
-  } catch (err) {
-    mlStatus.textContent = 'Could not reach the app server — the list was not saved.';
+  const parsed = validList({
+    personName: document.getElementById('mlName').value,
+    email: document.getElementById('mlEmail').value,
+    meds: collectMedRows(),
+  });
+  if (!parsed) {
+    mlStatus.textContent = 'A person name and at least one medicine (with drug name) are required. Email must look like an email address if provided.';
     mlStatus.classList.add('is-error');
+    return;
   }
+  const list = { id: crypto.randomUUID(), ...parsed, createdAt: new Date().toISOString() };
+  lists.push(list);
+  canStore = saveListsLocal(lists) && canStore;
+  if (!canStore) refreshStorageNote();
+  mlStatus.textContent = `Saved ${escapeHtml(list.personName)}'s medicine list (${list.meds.length} medicine${list.meds.length > 1 ? 's' : ''}) — on this device only.`;
+  mlStatus.classList.remove('is-error');
+  medListForm.reset();
+  mlMedRows.innerHTML = '';
+  addMedRow();
+  addMedRow();
+  renderMedLists();
 });
 
-async function apiGet(path) {
-  const res = await fetch(API_BASE + path);
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
-}
+/* Export / Import */
+document.getElementById('mlExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ app: 'GeneriCheck', version: 1, exportedAt: new Date().toISOString(), lists }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'genericheck-medicine-lists.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
-async function loadMedLists() {
-  try {
-    const data = await apiGet('/api/lists');
-    renderMedLists(data.lists || []);
-  } catch (err) {
-    medListsEl.innerHTML = '<p class="live-status is-error">Could not load saved medicine lists (server unreachable).</p>';
-  }
-}
+document.getElementById('mlImport').addEventListener('click', () => {
+  document.getElementById('mlImportFile').click();
+});
+
+document.getElementById('mlImportFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result));
+      const imported = Array.isArray(parsed.lists) ? parsed.lists : [];
+      const valid = imported.map(validList).filter(Boolean);
+      if (!valid.length) throw new Error('no valid lists');
+      const existingIds = new Set(lists.map((l) => l.id));
+      let added = 0;
+      for (const v of valid) {
+        if (!existingIds.has(v.id || '')) { lists.push({ id: v.id || crypto.randomUUID(), ...v, createdAt: v.createdAt || new Date().toISOString() }); added++; }
+      }
+      canStore = saveListsLocal(lists) && canStore;
+      if (!canStore) refreshStorageNote();
+      mlStatus.textContent = `Imported ${added} medicine list${added === 1 ? '' : 's'} from the file — on this device only.`;
+      mlStatus.classList.remove('is-error');
+      renderMedLists();
+    } catch {
+      mlStatus.textContent = 'That file does not look like a GeneriCheck export.';
+      mlStatus.classList.add('is-error');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
 
 function medCard(list) {
   const meds = list.meds.map((m) => escapeHtml(m.drug)).join(', ');
@@ -833,43 +920,63 @@ function medCard(list) {
       <p class="recs-note">${meds}</p>
       <div class="ml-actions">
         <button class="btn btn-primary ml-report-btn" data-id="${list.id}" type="button">Run monthly report</button>
-        <a class="btn btn-ghost" href="${API_BASE}/api/lists/${list.id}/ics" download>Calendar reminder (.ics)</a>
+        <button class="btn btn-ghost ml-ics-btn" data-id="${list.id}" type="button">Calendar reminder (.ics)</button>
         ${list.email ? `<button class="btn btn-ghost ml-mailto-btn" data-id="${list.id}" type="button">Email report</button>` : ''}
         <button class="btn btn-ghost ml-delete-btn" data-id="${list.id}" type="button">Remove</button>
       </div>
     </div>`;
 }
 
-function renderMedLists(lists) {
+function renderMedLists() {
   if (!lists.length) {
-    medListsEl.innerHTML = '<p class="live-status">No medicine lists saved yet — add one above (one per person).</p>';
+    medListsEl.innerHTML = '<p class="live-status">No medicine lists saved on this device yet — add one above (one per person).</p>';
     return;
   }
   medListsEl.innerHTML = lists.map(medCard).join('');
 }
+renderMedLists();
 
 medListsEl.addEventListener('click', async (e) => {
   const reportBtn = e.target.closest('.ml-report-btn');
   const mailtoBtn = e.target.closest('.ml-mailto-btn');
+  const icsBtn = e.target.closest('.ml-ics-btn');
   const deleteBtn = e.target.closest('.ml-delete-btn');
   if (reportBtn) runMonthlyReport(reportBtn.dataset.id);
   if (mailtoBtn) emailReport(mailtoBtn.dataset.id);
+  if (icsBtn) downloadIcs(icsBtn.dataset.id);
   if (deleteBtn) removeList(deleteBtn);
 });
 
-async function removeList(btn) {
+function removeList(btn) {
   if (btn.dataset.armed !== '1') {
     btn.dataset.armed = '1';
     btn.textContent = 'Confirm remove?';
     setTimeout(() => { btn.dataset.armed = '0'; btn.textContent = 'Remove'; }, 4000);
     return;
   }
+  lists = lists.filter((l) => l.id !== btn.dataset.id);
+  saveListsLocal(lists);
+  renderMedLists();
+  medReportEl.hidden = true;
+}
+
+/* Client-side openFDA query (same public API as the live check) */
+async function fdaRecallLookup(drugName) {
   try {
-    await fetch(API_BASE + '/api/lists/' + btn.dataset.id, { method: 'DELETE' });
-    loadMedLists();
-    medReportEl.hidden = true;
-  } catch (err) {
-    mlStatus.textContent = 'Could not remove the list (server unreachable).';
+    const res = await fetch('https://api.fda.gov/drug/enforcement.json?search=openfda.generic_name:"' + encodeURIComponent(drugName) + '"&sort=report_date:desc&limit=5');
+    if (res.status === 404) return { status: 'no-matching-records' };
+    if (!res.ok) return { status: 'source-failure', error: 'HTTP ' + res.status };
+    const data = await res.json();
+    return {
+      status: 'ok',
+      recalls: data.results.map((r) => ({
+        classification: r.classification, status: r.status, reportDate: r.report_date,
+        recallingFirm: r.recalling_firm, product: r.product_description,
+        reason: r.reason_for_recall, lots: r.code_info,
+      })),
+    };
+  } catch {
+    return { status: 'source-failure', error: 'network' };
   }
 }
 
@@ -878,72 +985,115 @@ function recallLine(r) {
     <div class="live-recall">
       <p class="live-row"><strong>${escapeHtml(r.classification)}</strong> · ${escapeHtml(r.status)} · reported ${escapeHtml(r.reportDate)} · recalling firm: <strong>${escapeHtml(r.recallingFirm)}</strong></p>
       <p class="live-row">${escapeHtml(r.product)}</p>
-      <p class="live-row">Reason: ${escapeHtml(r.reason)} · Lots/NDCs: ${escapeHtml(r.lots)}</p>
+      <p class="live-row">Reason: ${escapeHtml(r.reason)} · Lots/NDCs: ${escapeHtml(Array.isArray(r.lots) ? r.lots.join(', ') : r.lots)}</p>
     </div>`;
 }
 
-async function runMonthlyReport(id) {
-  medReportEl.hidden = false;
-  medReportEl.innerHTML = '<p class="live-status">Generating the monthly report — querying the FDA openFDA API for each medicine…</p>';
-  medReportEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  try {
-    const report = await apiGet('/api/lists/' + id + '/report');
-    const sections = report.meds.map((m) => {
-      const head = `
-        <h4>${escapeHtml(m.drug)}${m.strength ? ' ' + escapeHtml(m.strength) : ''}${m.maker ? ' — ' + escapeHtml(m.maker) : ''}${m.ndc ? ' · NDC ' + escapeHtml(m.ndc) : ''}</h4>`;
-      let body;
-      if (m.status === 'source-failure') {
-        body = '<p class="live-status is-error">Source unreachable (' + escapeHtml(m.error || 'error') + ') — a check failure, not "no findings". Re-run shortly.</p>';
-      } else if (m.status === 'no-matching-records') {
-        body = '<p class="live-row">No matching recall records found in this query — which is not the same as "no recalls exist anywhere". Coverage: drug enforcement reports indexed by openFDA, matched on the drug name.</p>';
-      } else {
-        body = (m.recalls || []).map(recallLine).join('') +
-          '<p class="recs-note">A recalling firm or drug name alone does not confirm this person\'s bottle is affected — check the lot number and NDC with the pharmacist.</p>';
-      }
-      return `<div class="live-card">${head}${body}</div>`;
-    }).join('');
+const REPORT_NOTES = [
+  'No matching records means none found in this query — not "no recalls exist anywhere".',
+  'A recalling firm or drug name alone does not confirm YOUR bottle is affected — check the lot number and NDC with your pharmacist.',
+  'Also check the factory and inspection history at ProPublica Rx Inspector, and the TE code in the Orange Book.',
+  'Update this list whenever a label shows a new maker. Never stop or change a medication on your own — discuss findings with your pharmacist or prescriber.',
+];
 
-    medReportEl.innerHTML = `
-      <div class="result-card">
-        <div class="result-head">
-          <div class="result-id">
-            <p class="result-brand">Monthly medicine quality check</p>
-            <h2 class="result-name">${escapeHtml(report.personName)}</h2>
-            <p class="result-barcode">Generated ${new Date(report.generatedAt).toLocaleString()} · real FDA data — never scored</p>
-          </div>
-          <span class="mock-badge">Real data</span>
-        </div>
-        ${sections}
-        <ul class="checklist">
-          ${report.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}
-        </ul>
-      </div>`;
-  } catch (err) {
-    medReportEl.innerHTML = '<p class="live-status is-error">Could not generate the report (server or FDA API unreachable) — a source failure, not "no findings".</p>';
+async function buildReportLocal(list) {
+  const meds = [];
+  for (const med of list.meds) {
+    const entry = { ...med, queriedAt: new Date().toISOString() };
+    Object.assign(entry, await fdaRecallLookup(med.drug));
+    meds.push(entry);
   }
+  return { generatedAt: new Date().toISOString(), personName: list.personName, email: list.email, meds, notes: REPORT_NOTES };
+}
+
+async function runMonthlyReport(id) {
+  const list = lists.find((l) => l.id === id);
+  if (!list) return;
+  medReportEl.hidden = false;
+  medReportEl.innerHTML = '<p class="live-status">Generating the monthly report — querying the FDA openFDA API for each medicine (drug names only are sent; this device\'s name and email are not)…</p>';
+  medReportEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const report = await buildReportLocal(list);
+
+  const sections = report.meds.map((m) => {
+    const head = `
+      <h4>${escapeHtml(m.drug)}${m.strength ? ' ' + escapeHtml(m.strength) : ''}${m.maker ? ' — ' + escapeHtml(m.maker) : ''}${m.ndc ? ' · NDC ' + escapeHtml(m.ndc) : ''}</h4>`;
+    let body;
+    if (m.status === 'source-failure') {
+      body = '<p class="live-status is-error">Source unreachable (' + escapeHtml(m.error || 'error') + ') — a check failure, not "no findings". Re-run shortly.</p>';
+    } else if (m.status === 'no-matching-records') {
+      body = '<p class="live-row">No matching recall records found in this query — which is not the same as "no recalls exist anywhere". Coverage: drug enforcement reports indexed by openFDA, matched on the drug name.</p>';
+    } else {
+      body = (m.recalls || []).map(recallLine).join('') +
+        '<p class="recs-note">A recalling firm or drug name alone does not confirm this person\'s bottle is affected — check the lot number and NDC with the pharmacist.</p>';
+    }
+    return `<div class="live-card">${head}${body}</div>`;
+  }).join('');
+
+  medReportEl.innerHTML = `
+    <div class="result-card">
+      <div class="result-head">
+        <div class="result-id">
+          <p class="result-brand">Monthly medicine quality check</p>
+          <h2 class="result-name">${escapeHtml(report.personName)}</h2>
+          <p class="result-barcode">Generated ${new Date(report.generatedAt).toLocaleString()} · real FDA data — never scored</p>
+        </div>
+        <span class="mock-badge">Real data</span>
+      </div>
+      ${sections}
+      <ul class="checklist">
+        ${report.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+function downloadIcs(id) {
+  const list = lists.find((l) => l.id === id);
+  if (!list) return;
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const dt = (d) => `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}T090000`;
+  const medSummary = list.meds
+    .map((m) => `${m.drug}${m.strength ? ' ' + m.strength : ''}${m.maker ? ' (' + m.maker + ')' : ''}`)
+    .join('; ');
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GeneriCheck//Medicine Monitor//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    'UID:' + list.id + '@genericheck',
+    'DTSTAMP:' + dt(now) + 'Z',
+    'DTSTART:' + dt(next),
+    'RRULE:FREQ=MONTHLY;INTERVAL=1',
+    'SUMMARY:Monthly medicine quality check — ' + list.personName,
+    'DESCRIPTION:Check recalls & maker changes for: ' + medSummary + '. Open GeneriCheck and run the monthly report. Check the lot number on each bottle. Never stop a medication on your own — talk to your pharmacist.',
+    'BEGIN:VALARM', 'TRIGGER:-PT0M', 'ACTION:DISPLAY', 'DESCRIPTION:Monthly medicine quality check', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  const blob = new Blob([ics], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'medicine-check-' + list.personName.replace(/\s+/g, '-') + '.ics';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function emailReport(id) {
-  try {
-    const report = await apiGet('/api/lists/' + id + '/report');
-    const lines = [`Monthly medicine quality check — ${report.personName}`, `Generated ${new Date(report.generatedAt).toLocaleString()}`, ''];
-    for (const m of report.meds) {
-      const label = `${m.drug}${m.strength ? ' ' + m.strength : ''}${m.maker ? ' (' + m.maker + ')' : ''}`;
-      if (m.status === 'ok') {
-        lines.push(`${label}: ${m.recalls.length} matching recall record(s) in openFDA — check lots with your pharmacist.`);
-        for (const r of m.recalls) lines.push(`  - ${r.classification}, ${r.status}, reported ${r.reportDate}, firm: ${r.recallingFirm}`);
-      } else if (m.status === 'no-matching-records') {
-        lines.push(`${label}: no matching recall records in this query (not the same as "no recalls exist").`);
-      } else {
-        lines.push(`${label}: source unreachable — re-run the check.`);
-      }
+  const list = lists.find((l) => l.id === id);
+  if (!list || !list.email) return;
+  const report = await buildReportLocal(list);
+  const lines = [`Monthly medicine quality check — ${report.personName}`, `Generated ${new Date(report.generatedAt).toLocaleString()}`, ''];
+  for (const m of report.meds) {
+    const label = `${m.drug}${m.strength ? ' ' + m.strength : ''}${m.maker ? ' (' + m.maker + ')' : ''}`;
+    if (m.status === 'ok') {
+      lines.push(`${label}: ${m.recalls.length} matching recall record(s) in openFDA — check lots with your pharmacist.`);
+      for (const r of m.recalls) lines.push(`  - ${r.classification}, ${r.status}, reported ${r.reportDate}, firm: ${r.recallingFirm}`);
+    } else if (m.status === 'no-matching-records') {
+      lines.push(`${label}: no matching recall records in this query (not the same as "no recalls exist").`);
+    } else {
+      lines.push(`${label}: source unreachable — re-run the check.`);
     }
-    lines.push('', 'Never stop or change a medication on your own — discuss findings with your pharmacist or prescriber.');
-    const subject = `Monthly medicine quality check — ${report.personName}`;
-    window.location.href = 'mailto:' + encodeURIComponent(report.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(lines.join('\n'));
-  } catch (err) {
-    mlStatus.textContent = 'Could not build the email (server unreachable).';
   }
+  lines.push('', 'Never stop or change a medication on your own — discuss findings with your pharmacist or prescriber.');
+  const subject = `Monthly medicine quality check — ${report.personName}`;
+  window.location.href = 'mailto:' + encodeURIComponent(report.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(lines.join('\n'));
 }
-
-loadMedLists();
