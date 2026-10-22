@@ -2,8 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | v1.0 — reflects shipped product |
-| **Last updated** | October 2026 |
+| **Status** | v1.1 — reflects shipped product + deployment |
+| **Public URL** | https://gravishankar.github.io/GenericCheck/ (GitHub Pages) |
+| **Last updated** | October 22, 2026 |
 | **Owner** | Product: GeneriCheck |
 | **Related docs** | [README.md](../README.md) (end users) · [docs/ENGINEERING.md](ENGINEERING.md) (architecture, maintenance, expansion) |
 
@@ -117,7 +118,19 @@ Meanwhile, the highest-stakes population — patients on **narrow-therapeutic-in
 - **Data recency:** Rx Inspector release is a snapshot (currently November 2025) — vintage is displayed, and the NDC→factory mapping can be stale (silent switch applies to the data too).
 - **No backend by design:** static hosting only; the sandboxed preview environment forbids browser storage APIs (hence the adapter pattern and file export/import).
 
-## 8. Risks & mitigations
+## 8. Distribution & deployment
+
+The product ships as one codebase in three forms:
+
+| Channel | What it is | Audience | Medicine lists |
+|---|---|---|---|
+| **GitHub Pages** (primary public) | `https://gravishankar.github.io/GenericCheck/` — served from the `master` branch of the owner's repo | Anyone with the link; no account needed | Last for the visit; Export/Import backup |
+| **Standalone single file** (`genericheck-standalone.html`) | A downloadable one-file build with a storage adapter | Personal copies for committed monthly users | Auto-save on the device where it runs |
+| **Development preview** (private) | The Perplexity `/computer/a` preview the app is developed in | The owner and collaborators | Last for the visit (sandboxed environment) |
+
+Deployment facts: updates are a `git push` to `master` (Pages rebuilds in ~1-2 minutes); a `.nojekyll` file is committed so GitHub serves the files as-is; the repo is the source of truth. The camera scanner requires https — all public channels serve over https, so scanning works everywhere including iPhone (software-decoder fallback). A `pplx.app` publication was attempted and remains unreliable due to a platform serving issue — not used for distribution; GitHub Pages is the public home. **The standalone build must be regenerated (`scripts/build-standalone.py`) after any source change** — see the engineering guide.
+
+## 9. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
@@ -128,7 +141,7 @@ Meanwhile, the highest-stakes population — patients on **narrow-therapeutic-in
 | Data source unavailability (FDA API, CDN, GitHub raw) | Distinct failure states with honest wording; manual-entry fallbacks everywhere |
 | Users lose lists (cleared browser data, sandboxed preview) | Export/import files; standalone version auto-saves; docs explain both |
 
-## 9. Success metrics
+## 10. Success metrics
 
 This product deliberately ships **no telemetry** (NFR1), so success is measured qualitatively:
 
@@ -137,22 +150,25 @@ This product deliberately ships **no telemetry** (NFR1), so success is measured 
 - **Comprehension:** short survey — do users correctly state what the tool never does (rate real companies, give medical advice, store their data)?
 - **Trust signals:** unprompted user feedback citing the honesty framing; pharmacist-reported quality of user-prepared questions.
 
-## 10. Roadmap (proposed, not committed)
+## 11. Roadmap (proposed, not committed)
 
 | Priority | Candidate | Note |
 |---|---|---|
 | P2 | Orange Book TE-code lookup integration | Already modeled categorically; needs an API/data pipeline |
 | P2 | EU/UK/Canada regulator records (EudraGMDP, MHRA, Health Canada) | Extends the monitoring checklist; no openFDA-equivalent APIs |
 | P2 | PWA / offline service worker for the standalone build | Deployed preview environment constrains what can ship hosted |
+| P2 | Host the standalone auto-save version at `/standalone.html` on the public site | Lets committed users get the auto-saving version as a link instead of a file; pending owner decision |
 | P3 | i18n | Strings currently inline |
 | P3 | Automated monthly email | Requires an email connector + scheduled task outside this codebase; breaks the serverless design — explicit product decision required |
 | — | Backend sync of medicine lists | **Rejected** unless users demand it; would break the local-first privacy model. Export/import files must keep working regardless |
 
-## 11. Open questions
+## 12. Open questions
 
-1. Should the standalone file be distributed via GitHub Pages (a link instead of a file)? The app works both ways; distribution method affects nothing technical.
+1. ~~How should the app be distributed?~~ **Resolved:** GitHub Pages is the public home; the standalone file is the personal-copy channel.
 2. Is a licensed-attorney review of the Terms & Disclaimer warranted before distribution beyond friends and family? (Recommended.)
 3. If ProPublica updates the Rx Inspector release, who owns the vintage-refresh chore? (Currently: maintainers, per the engineering guide.)
+4. Should a custom domain (e.g. `genericheck.app`) be pointed at GitHub Pages? Cosmetic + discoverability decision only.
+5. First-user feedback round: the original requester is exploring the app; her feedback should drive the next iteration (v1.2).
 
 ---
 
